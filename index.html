@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Nivora — Finance &amp; Health</title>
+<meta name="description" content="Nivora: expenses, budgets and medicine reminders in one place." />
+<meta name="theme-color" content="#0d9488" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png" />
+<link rel="icon" type="image/png" sizes="64x64" href="assets/icon-64.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/tailwind.css" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+<noscript>Nivora needs JavaScript to run.</noscript>
+<div id="app"></div>
+<div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none" aria-live="polite"></div>
+<div id="modal-root"></div>
+
+<!-- Classic scripts, order matters: they share one global scope (inline onclick handlers rely on it). -->
+<script src="js/01-core.js" defer></script>
+<script src="js/02-onboarding.js" defer></script>
+<script src="js/03-views.js" defer></script>
+<script src="js/04-insights-actions.js" defer></script>
+<script src="js/05-medicines-map-render.js" defer></script>
+<script src="js/06-extensions.js" defer></script>
+<script src="js/07-smart-add-scan.js" defer></script>
+<script src="js/08-boot.js" defer></script>
+<script>
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+</script>
+</body>
+</html>
