@@ -35,7 +35,8 @@
 <script src="js/07-smart-add-scan.js" defer></script>
 <script src="js/08-boot.js" defer></script>
 <script>
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  var native = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+  if ('serviceWorker' in navigator && location.protocol !== 'file:' && !native) {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }
 </script>
