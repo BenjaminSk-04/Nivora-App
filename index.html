@@ -1,47 +1,58 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Nivora — Finance &amp; Health</title>
-<meta name="description" content="Nivora: expenses, budgets and medicine reminders in one place." />
-<meta name="theme-color" content="#0d9488" />
-<link rel="manifest" href="manifest.webmanifest" />
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png" />
-<link rel="icon" type="image/png" sizes="64x64" href="assets/icon-64.png" />
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="mobile-web-app-capable" content="yes" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/tailwind.css" />
-<link rel="stylesheet" href="css/styles.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f8fc">
+  <meta name="description" content="Nivora - your private finance and health companion.">
+  <title>Nivora</title>
+  <link rel="stylesheet" href="/src/styles.css">
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen">
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="Nivora home"><span class="brand-mark">n</span><span>Nivora</span></a>
+      <div class="side-label">WORKSPACE</div>
+      <nav id="sideNav" class="side-nav">
+        <button class="nav-item active" data-page="home"><span>⌂</span>Overview</button>
+        <button class="nav-item" data-page="transactions"><span>↗</span>Transactions</button>
+        <button class="nav-item" data-page="budgets"><span>▤</span>Budgets</button>
+        <button class="nav-item" data-page="splits"><span>⇄</span>Shared expenses</button>
+        <button class="nav-item" data-page="goals"><span>◎</span>Savings goals</button>
+      </nav>
+      <div class="side-label health-label">PERSONAL CARE</div>
+      <nav class="side-nav">
+        <button class="nav-item" data-page="medicines"><span>✚</span>Medicines</button>
+        <button class="nav-item" data-page="bills"><span>▧</span>Bills & receipts</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="privacy-note"><span class="privacy-dot"></span><div><strong>Your data stays yours</strong><small>Stored on this device</small></div></div>
+        <button class="nav-item" data-page="settings"><span>⚙</span>Settings</button>
+      </div>
+    </aside>
 
-<noscript>Nivora needs JavaScript to run.</noscript>
-<div id="app"></div>
-<div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none" aria-live="polite"></div>
-<div id="modal-root"></div>
+    <main class="main-area">
+      <header class="topbar">
+        <div><div class="eyebrow" id="todayLabel">YOUR PERSONAL SPACE</div><h1 id="pageTitle">Overview</h1></div>
+        <div class="top-actions"><span class="offline-pill"><i></i> Offline ready</span><button class="avatar" id="profileButton" aria-label="Edit profile">N</button></div>
+      </header>
+      <section id="pageContent" class="page-content" aria-live="polite"></section>
+    </main>
+  </div>
 
-<!-- Classic scripts, order matters: they share one global scope (inline onclick handlers rely on it). -->
-<script src="js/01-core.js" defer></script>
-<script src="js/02-onboarding.js" defer></script>
-<script src="js/03-views.js" defer></script>
-<script src="js/04-insights-actions.js" defer></script>
-<script src="js/05-medicines-map-render.js" defer></script>
-<script src="js/06-extensions.js" defer></script>
-<script src="js/07-smart-add-scan.js" defer></script>
-<script src="js/08-native-alarms.js" defer></script>
-<script src="js/09-backup.js" defer></script>
-<script src="js/10-account.js" defer></script>
-<script src="js/99-boot.js" defer></script>
-<script>
-  var native = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
-  if ('serviceWorker' in navigator && location.protocol !== 'file:' && !native) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
-  }
-</script>
+  <nav class="mobile-nav" id="mobileNav">
+    <button class="mobile-item active" data-page="home"><span>⌂</span><small>Home</small></button>
+    <button class="mobile-item" data-page="transactions"><span>↗</span><small>Activity</small></button>
+    <button class="mobile-item" data-page="goals"><span>◎</span><small>Goals</small></button>
+    <button class="mobile-item" data-page="medicines"><span>✚</span><small>Health</small></button>
+    <button class="mobile-item" data-page="settings"><span>⚙</span><small>Settings</small></button>
+  </nav>
+
+  <dialog id="appDialog" class="app-dialog">
+    <form method="dialog" class="dialog-head"><div><span class="eyebrow">NIVORA</span><h2 id="dialogTitle">Add item</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></form>
+    <div id="dialogBody" class="dialog-body"></div>
+  </dialog>
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

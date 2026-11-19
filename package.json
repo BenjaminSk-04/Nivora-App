@@ -2,31 +2,31 @@
   "name": "nivora",
   "version": "1.0.0",
   "private": true,
-  "description": "Nivora \u2014 finance & health PWA",
-  "scripts": {
-    "css": "tailwindcss -i css/tailwind.src.css -o css/tailwind.css --minify",
-    "css:watch": "tailwindcss -i css/tailwind.src.css -o css/tailwind.css --watch",
-    "dev": "npm run css && npx --yes serve . -l 5173",
-    "build": "node scripts/build.mjs",
-    "preview": "npx --yes serve dist -l 4173",
-    "android:sync": "npm run build && npx cap sync android",
-    "android:open": "npx cap open android",
-    "test:alarms": "touch css/tailwind.css && SKIP_CSS=1 node scripts/build.mjs && python3 tests/native-alarms.test.py",
-    "test:local": "touch css/tailwind.css && SKIP_CSS=1 node scripts/build.mjs && python3 tests/local.test.py",
-    "test": "touch css/tailwind.css && SKIP_CSS=1 node scripts/build.mjs && python3 tests/native-alarms.test.py && python3 tests/local.test.py"
-  },
-  "devDependencies": {
-    "tailwindcss": "^3.4.17",
-    "@capacitor/cli": "^8.0.0"
-  },
-  "dependencies": {
-    "@capacitor/android": "^8.0.0",
-    "@capacitor/core": "^8.0.0",
-    "@capacitor/filesystem": "^8.0.0",
-    "@capacitor/local-notifications": "^8.0.0",
-    "@capacitor/share": "^8.0.0"
-  },
+  "description": "Nivora - private, offline-first personal finance and health companion",
+  "type": "module",
   "engines": {
     "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "android:add": "cap add android",
+    "android:sync": "npm run build && cap sync android"
+  },
+  "dependencies": {
+    "@capacitor-community/sqlite": "^8.1.1",
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/share": "^8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
+    "vite": "^7.2.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }

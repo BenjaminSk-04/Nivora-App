@@ -1,8 +1,10 @@
 node_modules/
 dist/
-css/tailwind.css
 android/
 ios/
 *.jks
 *.keystore
+.env
+.env.*
 .DS_Store
+.vite/
