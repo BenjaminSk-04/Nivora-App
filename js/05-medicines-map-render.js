@@ -135,18 +135,22 @@ function deleteMedicine(id) {
 }
 
 async function testReminder() {
+  if (NativeAlarms.isNative) {   // real OS alarm: lets the user verify it rings with the app closed
+    const r = await NativeAlarms.test(10);
+    if (!r.ok) return toast('Notifications are blocked. Allow them in Android Settings → Apps → Nivora.', 'warning');
+    toast('Test sent. Close the app: a reminder arrives in about 10 seconds.', 'success');
+    if (r.exact === 'denied') {
+      toast('For on-time alarms, allow "Alarms & reminders" for Nivora on the next screen.', 'warning');
+      setTimeout(NativeAlarms.openExactAlarmSettings, 1500);
+    }
+    return;
+  }
   const ok = await ensureNotificationPerm();
   const med = state.medicines.length > 0 ? state.medicines[0] : null;
   const name = med ? med.name : 'your medicine';
   const time = med && med.times.length > 0 ? med.times[0] : '21:00';
   fireReminder('💊 Medicine reminder', `Time to take ${name} (${fmtTime12(time)})`);
   if (!ok) toast('Browser notifications are blocked. Allow them in your browser site settings to get alerts.','warning');
-}
-
-function trackSaving(salt, amount) {
-  state.savingsTracker.push({ id: uid(), salt, saved: amount, at: new Date().toISOString() });
-  saveState(); render();
-  toast(`Tracked ${fmtINR(amount)} saved on ${salt}`, 'success');
 }
 
 function openNotifications() {
@@ -210,73 +214,13 @@ function openEditBudget(cat) {
   });
 }
 
-const PUNE_DEFAULT = { lat: 18.5074, lng: 73.8077 };
-function applyLocation(loc) {
-  kendraLocation = loc;
-  const box = $('#kendraList'); if (box) box.innerHTML = kendraListHTML();   // re-sort by distance
-  updateMapLocation();                                                          // move map, don't rebuild it
-}
-function getLocation() {
-  if (!navigator.geolocation) return toast('Geolocation not supported', 'error');
-  navigator.geolocation.getCurrentPosition(
-    pos => { applyLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); toast('Location updated', 'success'); },
-    () => { applyLocation({ ...PUNE_DEFAULT }); toast('Location denied — showing Pune default map', 'warning'); }
-  );
-}
-
 function confirmReset() {
   openModal('Reset demo data?', `
-    <p class="text-slate-600 mb-4">This will erase all expenses, medicines, and savings.</p>
+    <p class="text-slate-600 mb-4">This will erase all expenses and medicines.</p>
     <div class="flex gap-2">
       <button onclick="closeModal()" class="flex-1 border py-2.5 rounded-lg">Cancel</button>
       <button onclick="resetDemo();closeModal()" class="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-lg">Reset</button>
     </div>`);
-}
-
-/* Leaflet is only needed on /kendras, so it is fetched on first visit (with SRI) instead of on every page. */
-let leafletPromise = null;
-function loadLeaflet() {
-  if (window.L) return Promise.resolve();
-  if (leafletPromise) return leafletPromise;
-  leafletPromise = new Promise((resolve, reject) => {
-    const base = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet';
-    const css = document.createElement('link');
-    css.rel = 'stylesheet'; css.href = base + '.css';
-    css.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY='; css.crossOrigin = '';
-    const js = document.createElement('script');
-    js.src = base + '.js';
-    js.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo='; js.crossOrigin = '';
-    js.onload = () => resolve();
-    js.onerror = () => { leafletPromise = null; js.remove(); css.remove(); reject(new Error('Leaflet failed to load')); };
-    document.head.append(css, js);
-  });
-  return leafletPromise;
-}
-
-async function initMap() {
-  const el = document.getElementById('map');
-  if (!el) return;
-  if (kendraMapInstance && kendraMapInstance.getContainer() === el) return;   // already built for this element
-  try { await loadLeaflet(); }
-  catch { el.innerHTML = '<p class="p-6 text-sm text-slate-500 text-center">Map could not load (check your connection). The store list below still works.</p>'; return; }
-  if (document.getElementById('map') !== el) return;   // navigated away / re-rendered while Leaflet loaded
-  if (kendraMapInstance) { kendraMapInstance.remove(); kendraMapInstance = null; kendraYouMarker = null; }
-  const loc = kendraLocation || state.user.location || PUNE_DEFAULT;
-  const center = kendraLocation ? [loc.lat, loc.lng] : [20.5937, 78.9629];
-  const zoom   = kendraLocation ? 12 : 5;
-
-  const map = L.map('map', { scrollWheelZoom: false }).setView(center, zoom);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM', maxZoom: 19 }).addTo(map);
-  kendraYouMarker = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup('<strong>You are here</strong>');
-  state.kendras.forEach(k => L.marker([k.lat, k.lng]).addTo(map).bindPopup(`<strong>${esc(k.name)}</strong><br/>${esc(k.address)}`));
-  kendraMapInstance = map;
-  setTimeout(() => map.invalidateSize(), 200);
-}
-
-function updateMapLocation() {
-  if (!kendraMapInstance || !kendraLocation) return;
-  kendraMapInstance.setView([kendraLocation.lat, kendraLocation.lng], 12);
-  if (kendraYouMarker) kendraYouMarker.setLatLng([kendraLocation.lat, kendraLocation.lng]);
 }
 
 function refreshExpenseList() { const box = $('#expList'); if (box) box.innerHTML = expenseListHTML(); }
@@ -285,11 +229,11 @@ function handleCatFilter(el) { expenseFilter.cat = el.value; refreshExpenseList(
 
 function render() {
   const path = (window.location.hash.replace(/^#/, '') || '/dashboard');
-  if (!currentUser && !['/login','/signup'].includes(path)) return navigate('/login');
-  if (currentUser && ['/login','/signup'].includes(path)) return navigate('/dashboard');
+  if (!currentUser && !['/login','/signup','/forgot'].includes(path)) return navigate('/login');
+  if (currentUser && ['/login','/signup','/forgot'].includes(path)) return navigate('/dashboard');
 
   const app = $('#app');
-  if (['/login','/signup','/onboarding'].includes(path)) {
+  if (['/login','/signup','/forgot','/onboarding'].includes(path)) {
     app.innerHTML = views[path]();
     return;
   }
@@ -299,8 +243,6 @@ function render() {
     <main class="max-w-6xl mx-auto px-4 py-5 pb-24 md:pb-8">${(views[path] || views['/dashboard'])()}</main>
     ${bottomNav(path)}
   `;
-  if (path !== '/kendras' && kendraMapInstance) { kendraMapInstance.remove(); kendraMapInstance = null; kendraYouMarker = null; }
-  if (path === '/kendras') setTimeout(initMap, 50);
   document.documentElement.classList.toggle('large-text', state.user.largeText);
 }
 

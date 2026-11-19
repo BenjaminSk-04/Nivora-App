@@ -1,6 +1,5 @@
 function navigate(path) { window.location.hash = path; }
 const MONEY_TABS = [{ path:'/expenses', label:'Expenses' },{ path:'/budgets', label:'Budgets' },{ path:'/splits', label:'Splits' },{ path:'/insights', label:'Insights' }];
-const HEALTH_TABS = [{ path:'/medicines', label:'Medicines' },{ path:'/generic-finder', label:'Medicine Finder 💊' },{ path:'/kendras', label:'Locations' }];
 
 function profileMenuHTML() {
   const pct = profileCompletion(), item = 'w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 text-left';
@@ -10,7 +9,7 @@ function profileMenuHTML() {
     <div id="profileMenu" role="menu" class="hidden absolute right-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-50">
       <div class="px-4 py-4 flex items-center gap-3 border-b border-slate-100">
         <div class="w-11 h-11 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center font-bold shrink-0">${esc(state.user.avatarInitials)}</div>
-        <div class="min-w-0"><p class="font-semibold text-slate-900 truncate">${esc(state.user.name)}</p><p class="text-xs text-slate-500 truncate">${esc(state.user.email)}</p></div>
+        <div class="min-w-0"><p class="font-semibold text-slate-900 truncate">${esc(state.user.name)}</p><p class="text-xs text-slate-500 truncate">${isDemo() ? esc(state.user.email) : 'Stored on this phone'}</p></div>
       </div>
       ${pct < 100 ? `<div class="px-4 py-3 bg-slate-50 border-b border-slate-100"><div class="flex justify-between text-xs text-slate-500 mb-1"><span>Profile ${pct}% complete</span></div><div class="h-1.5 bg-slate-200 rounded"><div class="h-full bg-teal-500 rounded" style="width:${pct}%"></div></div></div>` : ''}
       <div class="py-1">
@@ -18,7 +17,7 @@ function profileMenuHTML() {
         <button type="button" role="menuitem" onclick="toggleProfileMenu(false); openEditProfile()" class="${item}"><span aria-hidden="true">✏️</span>Edit profile</button>
       </div>
       <div class="py-1 border-t border-slate-100">
-        <button type="button" role="menuitem" onclick="toggleProfileMenu(false); logout()" class="${item} !text-red-600 hover:!bg-red-50"><span aria-hidden="true">🚪</span>Log out</button>
+        <button type="button" role="menuitem" onclick="toggleProfileMenu(false); logout()" class="${item} "><span aria-hidden="true">🔄</span>Switch profile</button>
       </div>
     </div>
   </div>`;
@@ -39,7 +38,7 @@ function topNav(path) {
   const links = [ { p:'/dashboard', l:'Home' }, { p:'/expenses', l:'Money' }, { p:'/medicines', l:'Health' }, { p:'/settings', l:'Settings' } ];
   const active = (p) => {
     if (p === '/expenses') return path.startsWith('/expenses') || path.startsWith('/budgets') || path.startsWith('/splits') || path.startsWith('/insights');
-    if (p === '/medicines') return path.startsWith('/medicines') || path.startsWith('/generic-finder') || path.startsWith('/kendras');
+    if (p === '/medicines') return path.startsWith('/medicines');
     return path === p;
   };
   return `<header class="bg-white border-b border-slate-200 sticky top-0 z-40">
@@ -67,7 +66,7 @@ const NAV = [
 function bottomNav(path) {
   const active = (p) => {
     if (p === '/expenses') return ['/expenses','/budgets','/splits','/insights'].includes(path);
-    if (p === '/medicines') return ['/medicines','/generic-finder','/kendras'].includes(path);
+    if (p === '/medicines') return ['/medicines'].includes(path);
     return path === p;
   };
   return `<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 pb-[env(safe-area-inset-bottom)]">
@@ -82,45 +81,6 @@ function tabBar(path, tabs) {
 }
 
 const views = {};
-
-views['/login'] = () => `<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-slate-50 p-4">
-  <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 sm:p-8">
-    <div class="text-center mb-1 flex flex-col items-center">
-      ${LOGO_FULL}
-      <h1 class="sr-only">Nivora login</h1>
-    </div>
-    <form onsubmit="event.preventDefault(); handleLogin()" class="space-y-3 mt-4">
-      <label class="block"><span class="text-sm font-medium text-slate-700">Username or Email ID</span>
-        <input type="text" id="loginId" required autocomplete="username" value="aarav@demo.nivora" placeholder="Enter your username or email ID" class="mt-1 w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:border-teal-500 outline-none" /></label>
-      <label class="block"><span class="text-sm font-medium text-slate-700">Password</span>
-        <div class="mt-1 relative">
-          <input type="password" id="loginPassword" required value="demo1234" class="w-full px-3 py-2.5 pr-11 border border-slate-300 rounded-lg focus:border-teal-500 outline-none" />
-          <button type="button" onclick="togglePasswordVisibility(this)" class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-slate-700 rounded" aria-label="Show password">${ICONS.eye}</button>
-        </div></label>
-      <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-xl transition">Log in</button>
-    </form>
-    <p class="text-center text-sm text-slate-500 mt-4">New here? <a href="#/signup" class="text-teal-700 font-medium hover:underline">Sign up</a></p>
-  </div>
-</div>`;
-views['/signup'] = () => `<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-slate-50 p-4">
-  <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
-    <div class="text-center mb-6 flex flex-col items-center">
-      ${LOGO_SVG.replace('w-10 h-10', 'w-14 h-14')}
-      <h1 class="text-3xl font-extrabold text-slate-900 mt-2">Create account</h1>
-      <p class="text-sm text-slate-500 mt-1">Demo only: data stays in this browser.</p>
-    </div>
-    <form onsubmit="event.preventDefault(); handleSignup()" class="space-y-3 mt-5">
-      <label class="block"><span class="text-sm font-medium text-slate-700">Full name</span>
-        <input type="text" id="signupName" required class="mt-1 w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:border-teal-500 outline-none" /></label>
-      <label class="block"><span class="text-sm font-medium text-slate-700">Email</span>
-        <input type="email" id="signupEmail" required class="mt-1 w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:border-teal-500 outline-none" /></label>
-      <label class="block"><span class="text-sm font-medium text-slate-700">Password (min 8 characters)</span>
-        <input type="password" id="signupPassword" required minlength="8" class="mt-1 w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:border-teal-500 outline-none" /></label>
-      <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-xl transition">Sign up</button>
-    </form>
-    <p class="text-center text-sm text-slate-500 mt-4">Already have an account? <a href="#/login" class="text-teal-700 font-medium hover:underline">Log in</a></p>
-  </div>
-</div>`;
 
 views['/onboarding'] = () => {
   if (ob.email !== profileKey()) obReset();
@@ -176,6 +136,7 @@ views['/dashboard'] = () => {
 
   return `
   <div class="space-y-5">
+    ${backupNudgeHTML()}
     <div>
       <p class="text-sm text-slate-500">${new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' })}</p>
       <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mt-1">Hello, ${esc(currentUser?.username || state.user.name)} 👋</h1>
@@ -227,15 +188,12 @@ views['/dashboard'] = () => {
       <div class="text-sm text-amber-900"><p><strong>Refill needed:</strong> ${lowStock.map(m => esc(m.name)).join(', ')}</p></div>
     </div>` : ''}
 
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <a href="#/splits" class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 hover:border-teal-300 transition flex items-center gap-3">
         <div class="text-indigo-500">${ICONS.users}</div><p class="text-sm font-semibold text-slate-900">Split with flat</p>
       </a>
-      <a href="#/generic-finder" class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 hover:border-teal-300 transition flex items-center gap-3">
-        <div class="text-pink-500">${ICONS.pill}</div><p class="text-sm font-semibold text-slate-900">Medicine Finder 💊</p>
-      </a>
-      <a href="#/kendras" class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 hover:border-teal-300 transition flex items-center gap-3">
-        <div class="text-blue-500">${ICONS.map}</div><p class="text-sm font-semibold text-slate-900">Find location</p>
+      <a href="#/medicines" class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 hover:border-teal-300 transition flex items-center gap-3">
+        <div class="text-pink-500">${ICONS.pill}</div><p class="text-sm font-semibold text-slate-900">My medicines 💊</p>
       </a>
     </div>
 
@@ -417,9 +375,9 @@ views['/budgets'] = () => {
 
 views['/splits'] = () => {
   const gExps = state.expenses.filter(e => e.split).sort((a,b) => b.date.localeCompare(a.date));
-  const balances = computeBalances(gExps, FLAT_MEMBERS);
+  const balances = computeBalances(gExps, groupMembers());
   const settlements = settleUp(balances);
-  const myBalance = balances.Aarav;
+  const myBalance = balances[ME()] || 0;
 
   return `
   <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Money</h1>
@@ -429,17 +387,19 @@ views['/splits'] = () => {
       <div class="flex items-center justify-between mb-3">
         <div>
           <p class="text-xs uppercase opacity-80 font-semibold tracking-wide">Group</p>
-          <h2 class="text-xl font-extrabold">🏠 Flat 302</h2>
+          <h2 class="text-xl font-extrabold">🏠 ${esc(groupName())}</h2>
         </div>
+        <button onclick="openEditGroup()" class="text-xs font-medium bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg">Edit group</button>
       </div>
       <p class="text-sm opacity-90">${myBalance >= 0 ? 'You are owed' : 'You owe'}</p>
       <p class="text-3xl font-extrabold mt-1">${fmtINR2(Math.abs(myBalance))}</p>
+      ${groupMembers().length < 2 ? '<p class="text-xs mt-2 opacity-90">Add people with “Edit group” to start splitting expenses.</p>' : ''}
     </div>
 
     <div class="grid grid-cols-3 gap-3">
-      ${FLAT_MEMBERS.map(m => {
+      ${groupMembers().map(m => {
         const b = balances[m] || 0;
-        const isMe = m === 'Aarav';
+        const isMe = m === ME();
         const color = b > 0.01 ? 'text-teal-700' : b < -0.01 ? 'text-red-600' : 'text-slate-500';
         return `<div class="bg-white rounded-xl p-3 shadow-sm border ${isMe ? 'border-teal-300' : 'border-slate-100'} text-center">
           <p class="text-xs font-semibold text-slate-500">${isMe ? 'You' : m}</p>
@@ -480,7 +440,6 @@ views['/medicines'] = () => {
   const pending = doses.filter(d => d.status === 'pending');
   return `
   <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Health</h1>
-  ${tabBar('/medicines', HEALTH_TABS)}
   <div class="space-y-4">
     ${duplicateBannerHTML()}
     <div class="bg-gradient-to-br from-teal-600 to-teal-700 text-white rounded-2xl p-5 flex justify-between items-center">
@@ -537,113 +496,6 @@ views['/medicines'] = () => {
       </ul>
     </div>
     <p class="text-xs text-slate-400 text-center">⚠️ Not medical advice. Always consult your doctor.</p>
-  </div>`;
-};
-
-let genericSearch = '';
-function handleGenericSearch(el) {
-  genericSearch = el.value;
-  const box = $('#genList'); if (box) box.innerHTML = genericListHTML();
-}
-
-function genericListHTML() {
-  const q = genericSearch.toLowerCase().trim();
-  const results = q ? state.genericMeds.filter(g => genMatch(g, q)) : state.genericMeds;
-  const sorted = [...results].sort((a,b) => (b.brandPrice - b.jakPrice) - (a.brandPrice - a.jakPrice));
-  return sorted.map(g => {
-        const savings = g.brandPrice - g.jakPrice;
-        const savingsPct = Math.round((savings / g.brandPrice) * 100);
-        return `<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-          <div class="flex items-start justify-between gap-2 mb-3">
-            <div class="min-w-0">
-              <h3 class="font-bold text-slate-900">${esc(g.salt)}</h3>
-              <p class="text-xs text-slate-500">${esc(g.pack)}</p>
-            </div>
-            <span class="inline-block text-xs font-bold text-white px-2 py-0.5 rounded-full bg-teal-600">${savingsPct}% off</span>
-          </div>
-          <div class="grid grid-cols-2 gap-2 text-sm mb-3">
-            <div class="bg-slate-50 rounded-lg p-2.5">
-              <p class="text-xs text-slate-500 mb-0.5">Branded</p>
-              <p class="font-semibold text-slate-900">${esc(g.brand)}</p>
-              <p class="text-slate-700">${fmtINR(g.brandPrice)}</p>
-            </div>
-            <div class="bg-teal-50 rounded-lg p-2.5 border border-teal-200">
-              <p class="text-xs text-teal-700 mb-0.5">Jan Aushadhi</p>
-              <p class="font-semibold text-teal-900">${esc(g.jakBrand)}</p>
-              <p class="font-bold text-teal-900">${fmtINR(g.jakPrice)}</p>
-            </div>
-          </div>
-          <div class="flex items-center justify-between">
-            ${monthlySavingHTML(g, savings)}
-            <button onclick="trackSaving('${g.salt}', ${savings})" class="text-xs font-semibold bg-teal-600 text-white px-3 py-1.5 rounded-lg hover:bg-teal-700">+ Track saving</button>
-          </div>
-        </div>`;
-      }).join('');
-}
-
-views['/generic-finder'] = () => {
-  const totalSaved = state.savingsTracker.reduce((s, x) => s + x.saved, 0);
-
-  return `
-  <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Health</h1>
-  ${tabBar('/generic-finder', HEALTH_TABS)}
-  <div class="space-y-4">
-    <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-      <label class="block">
-        <span class="text-sm font-semibold text-slate-700">Search by salt / brand</span>
-        <input type="search" placeholder="e.g. salbutamol..." value="${esc(genericSearch)}" oninput="handleGenericSearch(this)" id="genSearch" class="mt-2 w-full px-4 py-3 border border-slate-300 rounded-xl focus:border-teal-500 outline-none text-base"/>
-      </label>
-    </div>
-
-    ${totalSaved > 0 ? `<div class="bg-teal-50 border border-teal-200 rounded-2xl p-4">
-      <p class="text-sm text-teal-900"><strong>💰 You've saved ${fmtINR(totalSaved)}</strong> by choosing generics.</p>
-    </div>` : ''}
-
-    <div id="genList" class="space-y-3">${genericListHTML()}</div>
-    <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900">
-      ⚠️ <strong>Not medical advice.</strong> Always consult your doctor or pharmacist before switching medication.
-    </div>
-  </div>`;
-};
-
-let kendraMapInstance = null;
-let kendraYouMarker = null;
-let kendraLocation = null;
-function kendraListHTML() {
-  const userLoc = kendraLocation || state.user.location || { lat: 18.5074, lng: 73.8077 };
-  const withDist = state.kendras.map(k => {
-    const dx = (k.lat - userLoc.lat) * 111;
-    const dy = (k.lng - userLoc.lng) * 111 * Math.cos(userLoc.lat * Math.PI/180);
-    return { ...k, dist: Math.sqrt(dx*dx + dy*dy) };
-  }).sort((a,b) => a.dist - b.dist);
-
-  return withDist.map(k => `<div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <div class="flex items-start justify-between gap-2 mb-1">
-          <div class="min-w-0">
-            <h3 class="font-semibold text-slate-900">${esc(k.name)}</h3>
-            <p class="text-xs text-slate-500 mt-0.5">${esc(k.address)}</p>
-            <p class="text-xs text-slate-500 mt-1">🕐 ${esc(k.timings)}</p>
-          </div>
-          <span class="text-xs font-bold text-teal-700 bg-teal-50 px-2 py-1 rounded-full whitespace-nowrap">${k.dist.toFixed(1)} km</span>
-        </div>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${k.lat},${k.lng}" target="_blank" rel="noopener" class="inline-block mt-2 text-sm font-medium text-teal-700 hover:underline">Get directions →</a>
-      </div>`).join('');
-}
-
-views['/kendras'] = () => {
-  return `
-  <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Health</h1>
-  ${tabBar('/kendras', HEALTH_TABS)}
-  <div class="space-y-4">
-    <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center justify-between">
-      <div>
-        <h2 class="font-bold text-slate-900">Jan Aushadhi Locations</h2>
-        <p class="text-xs text-slate-500">${state.kendras.length} stores in Pune</p>
-      </div>
-      <button onclick="getLocation()" class="text-sm bg-teal-600 text-white font-semibold px-3 py-2 rounded-lg hover:bg-teal-700">📍 Locate me</button>
-    </div>
-    <div id="map" class="bg-white shadow-sm border border-slate-100 overflow-hidden"></div>
-    <div id="kendraList" class="space-y-3">${kendraListHTML()}</div>
   </div>`;
 };
 

@@ -10,7 +10,10 @@
     "build": "node scripts/build.mjs",
     "preview": "npx --yes serve dist -l 4173",
     "android:sync": "npm run build && npx cap sync android",
-    "android:open": "npx cap open android"
+    "android:open": "npx cap open android",
+    "test:alarms": "touch css/tailwind.css && SKIP_CSS=1 node scripts/build.mjs && python3 tests/native-alarms.test.py",
+    "test:local": "touch css/tailwind.css && SKIP_CSS=1 node scripts/build.mjs && python3 tests/local.test.py",
+    "test": "touch css/tailwind.css && SKIP_CSS=1 node scripts/build.mjs && python3 tests/native-alarms.test.py && python3 tests/local.test.py"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.17",
@@ -18,7 +21,10 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
-    "@capacitor/core": "^8.0.0"
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/filesystem": "^8.0.0",
+    "@capacitor/local-notifications": "^8.0.0",
+    "@capacitor/share": "^8.0.0"
   },
   "engines": {
     "node": ">=22"

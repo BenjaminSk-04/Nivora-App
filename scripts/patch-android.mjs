@@ -7,10 +7,9 @@ const manifest = `${root}/app/src/main/AndroidManifest.xml`;
 const gradleFiles = [`${root}/app/build.gradle`, `${root}/app/build.gradle.kts`].filter(existsSync);
 
 const PERMISSIONS = [
-  'android.permission.ACCESS_COARSE_LOCATION', // nearby Jan Aushadhi Kendras
-  'android.permission.ACCESS_FINE_LOCATION',
   'android.permission.CAMERA',                 // bill / prescription scan
   'android.permission.POST_NOTIFICATIONS',     // medicine reminders (Android 13+)
+  'android.permission.SCHEDULE_EXACT_ALARM',  // on-time dose alarms (user can revoke in Settings)
   'android.permission.VIBRATE',                // reminder vibration
 ];
 
@@ -22,7 +21,21 @@ if (missing.length) {
   xml = xml.replace('<application', `${lines}\n\n    <application`);
   writeFileSync(manifest, xml);
 }
+// Health data must not leave the phone unless the user exports it: turn off Android's automatic cloud backup.
+xml = readFileSync(manifest, 'utf8');
+if (xml.includes('android:allowBackup="true"')) { writeFileSync(manifest, xml.replace('android:allowBackup="true"', 'android:allowBackup="false"')); console.log('allowBackup set to false'); }
 console.log(`Permissions added: ${missing.length ? missing.join(', ') : 'none (already present)'}`);
+
+// Backups are written to the app cache and handed to the share sheet through Android's FileProvider.
+// FileProvider can only share folders listed in res/xml/file_paths.xml, so make sure the cache folder is listed.
+const filePaths = `${root}/app/src/main/res/xml/file_paths.xml`;
+if (existsSync(filePaths)) {
+  let fp = readFileSync(filePaths, 'utf8');
+  if (!/<cache-path\b/.test(fp)) {
+    fp = fp.replace('</paths>', '    <cache-path name="nivora_cache" path="." />\n</paths>');
+    writeFileSync(filePaths, fp); console.log('file_paths.xml: added <cache-path> so backups can be shared');
+  } else console.log('file_paths.xml: cache-path already present');
+} else console.warn('WARNING: res/xml/file_paths.xml not found - sharing backups from the cache may fail on Android');
 
 const code = process.env.VERSION_CODE, name = process.env.VERSION_NAME;
 if (code && name) {

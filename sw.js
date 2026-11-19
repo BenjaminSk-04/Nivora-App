@@ -5,7 +5,7 @@ const SHELL = [
   './', 'index.html', 'manifest.webmanifest',
   'css/tailwind.css', 'css/styles.css',
   'js/01-core.js', 'js/02-onboarding.js', 'js/03-views.js', 'js/04-insights-actions.js',
-  'js/05-medicines-map-render.js', 'js/06-extensions.js', 'js/07-smart-add-scan.js', 'js/08-boot.js',
+  'js/05-medicines-map-render.js', 'js/06-extensions.js', 'js/07-smart-add-scan.js', 'js/08-native-alarms.js', 'js/09-backup.js', 'js/10-account.js', 'js/99-boot.js',
   'assets/icon-32.png', 'assets/icon-64.png', 'assets/icon-180.png',
   'assets/icon-192.png', 'assets/icon-512.png',
   'assets/logo-emblem.webp', 'assets/logo-full.webp',

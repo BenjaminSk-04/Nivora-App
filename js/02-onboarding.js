@@ -10,7 +10,7 @@ const MIN_AGE = 13;
 const GENDERS = ['Female', 'Male', 'Non-binary', 'Other (please specify)', 'Prefer not to say'];
 const BLOOD_GROUPS = ['A+', 'A−', 'B+', 'B−', 'AB+', 'AB−', 'O+', 'O−', 'Not sure'];
 const CONDITIONS = ['Diabetes', 'Hypertension', 'Asthma', 'Thyroid', 'Heart condition', 'Arthritis', 'None'];
-const GOALS = ['Track daily expenses', 'Stay within my monthly budget', 'Get medicine reminders', 'Save with generic medicines', 'Split flat expenses', 'Build my savings'];
+const GOALS = ['Track daily expenses', 'Stay within my monthly budget', 'Get medicine reminders', 'Split flat expenses', 'Build my savings'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const genderLabel = p => p.gender === 'Other (please specify)' ? (p.genderOther || 'Other') : p.gender;
 const digitsOf = v => String(v || '').replace(/\D/g, '');
@@ -270,7 +270,7 @@ function adherence() {
   return total ? Math.round((taken / total) * 100) : 0;
 }
 
-function myShare(e) { if (e.settlement) return 0; if (e.split) return e.split.shares.Aarav || 0; return (e.paidBy && e.paidBy !== 'Aarav') ? 0 : e.amount; }
+function myShare(e) { if (e.settlement) return 0; if (e.split) return e.split.shares[ME()] || 0; return (e.paidBy && e.paidBy !== ME()) ? 0 : e.amount; }
 function expensesThisMonth() { return state.expenses.filter(e => monthKey(e.date) === thisMonthKey()); }
 function expensesPrevMonth() { return state.expenses.filter(e => monthKey(e.date) === prevMonthKey()); }
 function totalSpentThisMonth() { return expensesThisMonth().reduce((s,e) => s + myShare(e), 0); }
@@ -305,7 +305,6 @@ function categorySpentPrevMonth() {
   for (const e of expensesPrevMonth()) map[e.category] = (map[e.category] || 0) + myShare(e);
   return map;
 }
-const FLAT_MEMBERS = ['Aarav','Rohan','Priya'];
 
 function progressBar(pct, color) {
   return `<div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden"><div class="h-full rounded-full transition-all duration-500" style="width:${Math.min(pct,100)}%;background:${color}"></div></div>`;

@@ -1,11 +1,11 @@
 /* ===================== Nivora extensions (v1.6) ===================== */
-state.ext = Object.assign({ balance:null, lowAt:1000, bills:[], caregiver:{name:'',phone:''}, upi:{}, alerted:{} }, state.ext || {});
+ensureExt();
 const ext = () => state.ext;
 const numOf = v => { const n = Number(String(v).replace(/,/g,'')); return Number.isFinite(n) ? n : NaN; };
 const catOptions = sel => CATEGORIES.map(c => `<option value="${c}" ${c===sel?'selected':''}>${CATEGORY_META[c].icon} ${c}</option>`).join('');
 const inCls = 'mt-1 w-full px-3 py-2.5 border border-slate-300 rounded-lg';
 function pushExpense(o) {
-  state.expenses.push({ id:'exp_'+uid(), receipt:null, split:null, paidBy:'Aarav', date:todayISO(), ...o });
+  state.expenses.push({ id:'exp_'+uid(), receipt:null, split:null, paidBy:ME(), date:todayISO(), ...o });
   saveState();
   const over = categorySpentThisMonth()[o.category] > (state.budgets[o.category] || Infinity);
   toast(over ? `Added ${fmtINR(o.amount)} — over your ${o.category} budget` : `Added ${fmtINR(o.amount)} · ${o.category}`, over ? 'warning' : 'success');
@@ -151,7 +151,7 @@ function markBillPaid(id) {
   const b = ext().bills.find(x => x.id === id); if (!b) return;
   b.paidMonth = thisMonthKey();
   if (ext().balance != null) ext().balance -= b.amount;
-  state.expenses.push({ id:'exp_'+uid(), amount:b.amount, category:autoCategorize(b.title), date:todayISO(), notes:b.title, paidBy:'Aarav', receipt:null, split:null });
+  state.expenses.push({ id:'exp_'+uid(), amount:b.amount, category:autoCategorize(b.title), date:todayISO(), notes:b.title, paidBy:ME(), receipt:null, split:null });
   saveState(); render(); openBills();
 }
 function deleteBill(id) { ext().bills = ext().bills.filter(x => x.id !== id); saveState(); render(); openBills(); }
@@ -180,39 +180,39 @@ function openSplitExpense() {
     <label class="block text-sm font-medium">Notes<input name="notes" class="${inCls}" placeholder="e.g. Electricity bill"/></label>
     <div class="grid grid-cols-2 gap-3">
       <label class="block text-sm font-medium">Category<select name="category" class="${inCls}">${catOptions('Other')}</select></label>
-      <label class="block text-sm font-medium">Paid by<select name="paidBy" class="${inCls}">${FLAT_MEMBERS.map(m => `<option>${m}</option>`).join('')}</select></label>
+      <label class="block text-sm font-medium">Paid by<select name="paidBy" class="${inCls}">${groupMembers().map(m => `<option>${m}</option>`).join('')}</select></label>
     </div>
     <label class="block text-sm font-medium">Split<select name="mode" id="spMode" class="${inCls}">
       <option value="equal">Equally</option><option value="percent">By percentage</option><option value="shares">By shares</option></select></label>
-    <div id="spRows" class="hidden grid grid-cols-3 gap-2">${FLAT_MEMBERS.map(m => `<label class="text-xs font-medium">${m}<input data-w type="number" step="0.01" min="0" class="${inCls}"/></label>`).join('')}</div>
+    <div id="spRows" class="hidden grid grid-cols-3 gap-2">${groupMembers().map(m => `<label class="text-xs font-medium">${m}<input data-w type="number" step="0.01" min="0" class="${inCls}"/></label>`).join('')}</div>
     <p id="spHint" class="text-xs text-slate-500"></p>
     <button class="w-full bg-teal-600 text-white font-semibold py-2.5 rounded-lg">Save shared expense</button></form>`, root => {
     const mode = root.querySelector('#spMode'), rows = root.querySelector('#spRows'), hint = root.querySelector('#spHint');
     const sync = () => {
       rows.classList.toggle('hidden', mode.value === 'equal');
-      root.querySelectorAll('[data-w]').forEach(i => i.value = mode.value === 'percent' ? (100 / FLAT_MEMBERS.length).toFixed(2) : mode.value === 'shares' ? 1 : '');
+      root.querySelectorAll('[data-w]').forEach(i => i.value = mode.value === 'percent' ? (100 / groupMembers().length).toFixed(2) : mode.value === 'shares' ? 1 : '');
       hint.textContent = mode.value === 'percent' ? 'Percentages must add up to 100.' : mode.value === 'shares' ? 'e.g. 2 shares for someone who uses twice as much.' : '';
     };
     mode.onchange = sync; sync();
     root.querySelector('#spForm').onsubmit = ev => {
       ev.preventDefault(); const fd = new FormData(ev.target), amount = Number(fd.get('amount')), m = fd.get('mode');
-      const w = m === 'equal' ? FLAT_MEMBERS.map(() => 1) : [...root.querySelectorAll('[data-w]')].map(i => Number(i.value) || 0);
+      const w = m === 'equal' ? groupMembers().map(() => 1) : [...root.querySelectorAll('[data-w]')].map(i => Number(i.value) || 0);
       if (!(amount > 0)) return toast('Enter an amount greater than 0', 'error');
       if (m === 'percent' && Math.abs(w.reduce((s, x) => s + x, 0) - 100) > 0.01) return toast('Percentages must add up to 100', 'error');
       if (m === 'shares' && !(w.reduce((s, x) => s + x, 0) > 0)) return toast('Give at least one person a share', 'error');
-      const sh = splitShares(amount, m, w), shares = {}; FLAT_MEMBERS.forEach((n, i) => shares[n] = sh[i]);
+      const sh = splitShares(amount, m, w), shares = {}; groupMembers().forEach((n, i) => shares[n] = sh[i]);
       if (Object.values(shares).some(v => v < 0)) return toast('Shares cannot be negative', 'error');
       const notes = String(fd.get('notes')).trim();
       closeModal();
-      state.expenses.push({ id:'exp_'+uid(), amount, category:fd.get('category'), date:todayISO(), notes, paidBy:fd.get('paidBy'), receipt:null, split:{ members:FLAT_MEMBERS, mode:m, shares } });
+      state.expenses.push({ id:'exp_'+uid(), amount, category:fd.get('category'), date:todayISO(), notes, paidBy:fd.get('paidBy'), receipt:null, split:{ members:groupMembers(), mode:m, shares } });
       saveState(); render(); toast('Shared expense added', 'success');
     };
   });
 }
 function settleExtraHTML(s) {
   const b = 'class="text-xs font-medium border border-slate-300 text-slate-700 px-2 py-1 rounded"';
-  if (s.from === 'Aarav') return `<button onclick="payUPI('${s.to}',${s.amount})" ${b}>Pay via UPI</button>`;
-  if (s.to === 'Aarav') return `<button onclick="remindOwes('${s.from}',${s.amount})" ${b}>Remind</button>`;
+  if (s.from === ME()) return `<button onclick="payUPI('${s.to}',${s.amount})" ${b}>Pay via UPI</button>`;
+  if (s.to === ME()) return `<button onclick="remindOwes('${s.from}',${s.amount})" ${b}>Remind</button>`;
   return '';
 }
 function openUpiId(name, cb) {
@@ -228,12 +228,11 @@ function openUpiId(name, cb) {
 function payUPI(to, amount) {
   const id = ext().upi[to]; if (!id) return openUpiId(to, () => payUPI(to, amount));
   toast('Opening your UPI app. Tap "Mark paid" after paying.', 'info');
-  location.href = `upi://pay?pa=${encodeURIComponent(id)}&pn=${encodeURIComponent(to)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Flat 302 split')}`;
+  location.href = `upi://pay?pa=${encodeURIComponent(id)}&pn=${encodeURIComponent(to)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(groupName() + ' split')}`;
 }
 function remindOwes(from, amount) {
   const text = `Hi ${from}! Friendly nudge: ${fmtINR2(amount)} is pending for our flat expenses. No rush, pay whenever convenient 🙂`;
-  if (navigator.share) navigator.share({ text }).catch(() => {});
-  else window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+  shareText('Nivora', text).then(r => { if (r === 'copied') toast('Message copied. Paste it into a chat.', 'success'); });
 }
 
 /* ---- 4. Medicines: stock countdown, caregiver alerts, doctor report ---- */
@@ -266,7 +265,7 @@ function caregiverCardHTML() {
       <button onclick="openCaregiver()" class="text-xs font-semibold text-teal-700">${c.phone ? 'Edit' : 'Set up'}</button></div>
     <p class="text-xs text-slate-500">${c.phone ? `Alerts go to ${esc(c.name || 'your caregiver')}. You tap send, as browsers can't text in the background.` : 'Add a contact to message when a dose is skipped or very late.'}</p>
     ${c.phone && late.length ? `<button onclick="caregiverPrompt(null,null)" class="w-full bg-amber-100 text-amber-900 text-sm font-semibold py-2 rounded-lg">${late.length} dose${late.length > 1 ? 's' : ''} over 1 hour late · Notify</button>` : ''}
-    <button onclick="openAdherenceReport()" class="w-full border border-slate-300 text-slate-700 text-sm font-semibold py-2 rounded-lg">📄 Doctor-ready adherence report</button></div>`;
+    <button onclick="openAdherenceReport()" class="w-full border border-slate-300 text-slate-700 text-sm font-semibold py-2 rounded-lg">📄 Adherence report for your doctor</button></div>`;
 }
 function openCaregiver() {
   const c = ext().caregiver;
@@ -291,37 +290,62 @@ function caregiverPrompt(med, time) {
     <a href="https://wa.me/${esc(c.phone.replace('+', ''))}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" onclick="closeModal()" class="text-center bg-green-600 text-white font-semibold py-2.5 rounded-lg">WhatsApp</a></div>
     <button onclick="closeModal()" class="mt-2 w-full border py-2.5 rounded-lg">Not now</button>`);
 }
-function openAdherenceReport() {
-  const now = new Date(), nm = now.getHours() * 60 + now.getMinutes();
-  const rows = state.medicines.map(m => {
+/* Last `days` days, per medicine: doses due / taken / skipped / missed. Doses later today are not counted yet. */
+function adherenceData(now = new Date(), days = 30) {
+  const nm = now.getHours() * 60 + now.getMinutes();
+  return state.medicines.map(m => {
     let due = 0, taken = 0, skipped = 0;
-    for (let i = 0; i < 30; i++) {
-      const d = daysAgoISO(i); if (!isDoseDue(m, d)) continue;
+    for (let i = 0; i < days; i++) {
+      const d = isoOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i));
+      if (!isDoseDue(m, d)) continue;
       for (const t of m.times) {
         const [h, mi] = t.split(':').map(Number); if (i === 0 && nm < h * 60 + mi) continue;
-        due++; const s = m.log?.[d]?.[t]; if (s === 'taken') taken++; else if (s === 'skipped') skipped++;
+        due++; const s = m.log && m.log[d] && m.log[d][t]; if (s === 'taken') taken++; else if (s === 'skipped') skipped++;
       }
     }
-    return `<tr><td>${esc(m.name)}<br><small>${esc(m.salt || '')} · ${esc(m.dosage || '')}</small></td><td>${m.times.map(fmtTime12).join(', ')}</td><td>${taken}/${due}</td><td>${skipped}</td><td>${due - taken - skipped}</td><td><b>${due ? Math.round(taken / due * 100) : 0}%</b></td></tr>`;
-  }).join('');
-  const w = window.open('', '_blank'); if (!w) return toast('Allow pop-ups to open the report', 'warning');
-  w.document.write(`<!doctype html><title>Adherence report</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Inter,system-ui,sans-serif;margin:24px;color:#0f172a}table{border-collapse:collapse;width:100%}td,th{border:1px solid #cbd5e1;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f1f5f9}small{color:#64748b}</style>
-    <h2>Medication adherence report</h2><p>${esc(state.user.name)} · last 30 days · generated ${now.toLocaleDateString('en-IN')}</p>
-    <table><tr><th>Medicine</th><th>Schedule</th><th>Taken</th><th>Skipped</th><th>Missed</th><th>Adherence</th></tr>${rows || '<tr><td colspan=6>No medicines</td></tr>'}</table>
-    <p><small>Self-reported in Nivora. Not a medical record. Please discuss any changes with your doctor.</small></p>`);
-  w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
+    return { name: m.name, salt: m.salt || '', dosage: m.dosage || '', schedule: m.times.map(fmtTime12).join(', '),
+             due, taken, skipped, missed: due - taken - skipped, pct: due ? Math.round(taken / due * 100) : null };
+  });
 }
-
-/* ---- 5. Generic comparison helpers ---- */
-function genMatch(g, q) { const hay = `${g.salt} ${g.brand} ${g.jakBrand}`.toLowerCase(); return q.split(/\s+/).every(w => hay.includes(w)); }
-function monthlySavingHTML(g, savings) {
-  const w = g.salt.toLowerCase().split(/\s+/)[0];
-  const med = state.medicines.find(m => `${m.salt} ${m.name}`.toLowerCase().includes(w));
-  const pd = med ? dosesPerDay(med) || 1 : 1, qty = parseInt(g.pack);
-  const packs = /inhaler|bottle|syrup|tube|drop/i.test(g.pack) || !qty ? 1 : Math.ceil(pd * 30 / qty);
-  return `<div><p class="text-xs text-teal-700 font-semibold">Save ${fmtINR(savings)} / pack</p>
-    <p class="text-xs text-teal-800">≈ ${fmtINR(savings * packs)}/month${med ? ` on your ${esc(med.name)}` : ' if taken once daily'}</p>
-    <p class="text-[10px] text-amber-700 mt-0.5">Confirm with your doctor or pharmacist before switching.</p></div>`;
+const isoOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+function adherenceText(rows, now = new Date()) {
+  const lines = [`Nivora - medication adherence report`, `${state.user.name} - last 30 days - ${now.toLocaleDateString('en-IN')}`, ''];
+  if (!rows.length) lines.push('No medicines added.');
+  rows.forEach(r => lines.push(`${r.name}${r.salt ? ' (' + r.salt + ')' : ''}${r.dosage ? ', ' + r.dosage : ''} - ${r.schedule}`,
+    `  Taken ${r.taken}/${r.due}${r.pct === null ? '' : ' (' + r.pct + '%)'}, skipped ${r.skipped}, missed ${r.missed}`));
+  lines.push('', 'Self-reported in Nivora. Not a medical record. Please discuss any changes with your doctor.');
+  return lines.join('\n');
 }
-
-
+/* Share text through the Android share sheet, the browser share dialog, or the clipboard. */
+async function shareText(title, text) {
+  const cap = window.Capacitor;
+  if (cap && cap.isNativePlatform && cap.isNativePlatform()) {
+    try { await cap.registerPlugin('Share').share({ title, text, dialogTitle: title }); return 'shared'; }
+    catch (e) { if (/cancel/i.test(String(e && e.message))) return 'cancelled'; }
+  }
+  if (navigator.share) { try { await navigator.share({ title, text }); return 'shared'; } catch (e) { if (e && e.name === 'AbortError') return 'cancelled'; } }
+  try { await navigator.clipboard.writeText(text); return 'copied'; } catch { return 'failed'; }
+}
+async function shareAdherenceReport() {
+  const r = await shareText('Nivora adherence report', adherenceText(adherenceData()));
+  if (r === 'copied') toast('Report copied. Paste it into a message or email.', 'success');
+  else if (r === 'failed') toast('Could not share the report on this device.', 'error');
+}
+function openAdherenceReport() {
+  const now = new Date(), rows = adherenceData(now);
+  const colour = p => p === null ? 'text-slate-500' : p >= 80 ? 'text-teal-700' : p >= 50 ? 'text-amber-700' : 'text-red-700';
+  const cards = rows.map(r => `<div class="border border-slate-200 rounded-xl p-3">
+      <p class="font-semibold text-slate-900">${esc(r.name)}</p>
+      <p class="text-xs text-slate-500">${esc(r.salt)}${r.salt && r.dosage ? ' · ' : ''}${esc(r.dosage)} · ${esc(r.schedule)}</p>
+      <div class="grid grid-cols-4 gap-2 text-center mt-2">
+        <div><p class="text-lg font-bold ${colour(r.pct)}">${r.pct === null ? '—' : r.pct + '%'}</p><p class="text-[11px] text-slate-500">Adherence</p></div>
+        <div><p class="text-lg font-bold text-slate-900">${r.taken}/${r.due}</p><p class="text-[11px] text-slate-500">Taken</p></div>
+        <div><p class="text-lg font-bold text-slate-900">${r.skipped}</p><p class="text-[11px] text-slate-500">Skipped</p></div>
+        <div><p class="text-lg font-bold text-slate-900">${r.missed}</p><p class="text-[11px] text-slate-500">Missed</p></div>
+      </div></div>`).join('');
+  openModal('Adherence report', `<p class="text-xs text-slate-500 mb-3">${esc(state.user.name)} · last 30 days · ${esc(now.toLocaleDateString('en-IN'))}</p>
+    <div class="space-y-2 max-h-[55vh] overflow-y-auto">${cards || '<p class="text-sm text-slate-600">No medicines added yet.</p>'}</div>
+    <p class="text-[11px] text-slate-500 mt-3">Self-reported in Nivora. Not a medical record. Please discuss any changes with your doctor.</p>
+    <div class="flex gap-2 mt-3"><button onclick="closeModal()" class="flex-1 border py-2.5 rounded-lg">Close</button>
+    <button onclick="shareAdherenceReport()" class="flex-1 bg-teal-600 text-white font-semibold py-2.5 rounded-lg">Share report</button></div>`);
+}

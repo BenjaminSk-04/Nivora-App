@@ -62,7 +62,6 @@ views['/insights'] = () => {
     const key = monthKeyOffset(i);
     sixMonths.push({ label: d.toLocaleDateString('en-IN', { month:'short' }), value: state.expenses.filter(e => monthKey(e.date) === key).reduce((s,e) => s + myShare(e), 0) });
   }
-  const totalSaved = state.savingsTracker.reduce((s, x) => s + x.saved, 0);
 
   return `
   <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Money</h1>
@@ -85,11 +84,6 @@ views['/insights'] = () => {
       <h2 class="font-bold text-slate-900 mb-3">6-month spend trend</h2>
       ${lineChart(sixMonths)}
     </div>
-    <div class="bg-gradient-to-br from-teal-600 to-teal-700 text-white rounded-2xl p-5">
-      <p class="text-xs uppercase font-semibold opacity-80 tracking-wide">Generic savings</p>
-      <p class="text-3xl font-extrabold mt-1">${fmtINR(totalSaved)}</p>
-      <a href="#/generic-finder" class="inline-block mt-3 bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1.5 text-sm font-medium">Find more savings →</a>
-    </div>
   </div>`;
 };
 
@@ -104,12 +98,9 @@ views['/settings'] = () => `
         <input type="checkbox" ${state.user.largeText?'checked':''} onchange="handleToggleLargeText(this)" class="w-12 h-6 appearance-none rounded-full bg-slate-300 checked:bg-teal-600 relative transition-all cursor-pointer before:content-[''] before:absolute before:top-0.5 before:left-0.5 before:w-5 before:h-5 before:bg-white before:rounded-full before:transition-transform checked:before:translate-x-6"/>
       </label>
     </div>
-    <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 space-y-2">
-      <h2 class="font-bold text-slate-900 mb-2">Data & Privacy</h2>
-      <button onclick="confirmReset()" class="w-full text-left py-2 text-slate-700 hover:text-teal-700 font-medium">🔄 Reset demo data</button>
-      <button onclick="logout()" class="w-full text-left py-2 text-red-600 hover:text-red-700 font-medium">🚪 Log out</button>
-    </div>
-    <p class="text-xs text-slate-400 text-center pb-6">Nivora v1.5</p>
+    ${backupCardHTML()}
+    ${accountCardHTML()}
+    <p class="text-xs text-slate-400 text-center pb-6">Nivora v${APP_VERSION}</p>
   </div>`;
 
 function profileCompletion() {
@@ -132,7 +123,7 @@ function profileCardHTML() {
         <button onclick="openEditProfile()" class="text-sm font-semibold text-teal-700 hover:underline">Edit</button></div>
       <div class="flex items-center gap-3">
         <div class="w-12 h-12 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center font-bold">${esc(state.user.avatarInitials)}</div>
-        <div class="min-w-0"><p class="font-semibold text-slate-900 truncate">${esc(state.user.name)}</p><p class="text-sm text-slate-500 truncate">${esc(state.user.email)}</p></div>
+        <div class="min-w-0"><p class="font-semibold text-slate-900 truncate">${esc(state.user.name)}</p><p class="text-sm text-slate-500 truncate">${isDemo() ? esc(state.user.email) : 'Stored on this phone'}</p></div>
       </div>
       ${rows.length ? `<dl class="mt-4 divide-y divide-slate-100 text-sm">${rows.map(([k, v]) => `<div class="flex justify-between gap-4 py-2"><dt class="text-slate-500 shrink-0">${k}</dt><dd class="text-slate-900 text-right break-words min-w-0">${esc(v)}</dd></div>`).join('')}</dl>` : ''}
       ${p.goals.length ? `<div class="mt-3"><p class="text-xs uppercase font-semibold text-slate-400 tracking-wide mb-2">Goals</p><div class="flex flex-wrap gap-2">${p.goals.map(g => `<span class="px-2.5 py-1 rounded-full bg-teal-50 text-teal-800 text-xs font-medium">${esc(g)}</span>`).join('')}</div></div>` : ''}
@@ -214,12 +205,12 @@ function openAddExpense(isGroup = false) {
       <label class="block ${isGroup ? '' : 'hidden'}" id="paidByWrap">
         <span class="text-sm font-medium text-slate-700">Paid by</span>
         <select name="paidBy" class="mt-1 w-full px-3 py-2.5 border border-slate-300 rounded-lg">
-          ${FLAT_MEMBERS.map(m => `<option>${m}</option>`).join('')}
+          ${groupMembers().map(m => `<option>${m}</option>`).join('')}
         </select>
       </label>
       ${!isGroup ? `<label class="flex items-center gap-2 mt-2 cursor-pointer">
         <input type="checkbox" name="split" class="w-4 h-4" onchange="document.getElementById('paidByWrap').classList.toggle('hidden', !this.checked)"/>
-        <span class="text-sm font-medium text-slate-700">Split with Flat 302</span>
+        <span class="text-sm font-medium text-slate-700">Split with ${esc(groupName())}</span>
       </label>` : ''}
       <div class="flex gap-2 pt-2">
         <button type="button" onclick="closeModal()" class="flex-1 border border-slate-300 text-slate-700 font-medium py-2.5 rounded-lg">Cancel</button>
@@ -238,11 +229,12 @@ function openAddExpense(isGroup = false) {
       const shouldSplit = isGroup || fd.get('split') === 'on';
       if (!(amount > 0)) return toast('Enter an amount greater than 0', 'error');
       
-      const exp = { id: 'exp_'+uid(), amount, category, date: fd.get('date') || todayISO(), notes: (fd.get('notes') || '').trim(), paidBy: shouldSplit ? fd.get('paidBy') : 'Aarav', receipt: null, split: null };
+      const exp = { id: 'exp_'+uid(), amount, category, date: fd.get('date') || todayISO(), notes: (fd.get('notes') || '').trim(), paidBy: shouldSplit ? fd.get('paidBy') : ME(), receipt: null, split: null };
       
       if (shouldSplit) {
-        const per = Math.round((amount / 3) * 100) / 100;
-        exp.split = { members: FLAT_MEMBERS, mode:'equal', shares: { Aarav: per, Rohan: per, Priya: Math.round((amount - per*2) * 100) / 100 } };
+        const ms = groupMembers(), sh = splitShares(amount, 'equal', ms.map(() => 1)), shares = {};
+        ms.forEach((n, i) => shares[n] = sh[i]);
+        exp.split = { members: ms.slice(), mode:'equal', shares };
       }
       
       state.expenses.push(exp);
@@ -332,3 +324,35 @@ function confirmSettle(from, to, amount) {
   saveState(); closeModal(); render(); toast('Settlement recorded ✓','success');
 }
 
+
+
+/* Group = a named list of people to split expenses with. They are just names (no Nivora account needed).
+   Names are restricted to letters, digits, space, dot and hyphen so they are always safe inside templates. */
+const GROUP_NAME_RE = /^[\p{L}\p{N} .\-]{1,20}$/u;
+function openEditGroup() {
+  const g = groupInfo(), me = ME();
+  openModal('Edit group', `<form id="grpForm" class="space-y-3">
+    <label class="block text-sm font-medium">Group name
+      <input name="name" maxlength="30" required value="${esc(g.name)}" class="mt-1 w-full px-3 py-2.5 border border-slate-300 rounded-lg" /></label>
+    <label class="block text-sm font-medium">Other people (one per line, up to 7)
+      <textarea name="members" rows="5" class="mt-1 w-full px-3 py-2.5 border border-slate-300 rounded-lg">${esc(g.members.filter(m => m !== me).join('\n'))}</textarea></label>
+    <p class="text-xs text-slate-500">These are only names for splitting expenses; they don't need accounts. Anyone who is part of an existing split can't be removed.</p>
+    <button class="w-full bg-teal-600 text-white font-semibold py-2.5 rounded-lg">Save</button>
+  </form>`, (root) => {
+    root.querySelector('#grpForm').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(ev.target);
+      const name = String(fd.get('name')).trim().replace(/\s+/g, ' ');
+      const others = [...new Set(String(fd.get('members')).split('\n').map(s => s.trim().replace(/\s+/g, ' ')).filter(Boolean))];
+      if (!/^[\p{L}\p{N} .\-]{1,30}$/u.test(name)) return toast('Group name: letters, numbers, spaces, . and - only', 'error');
+      const badName = others.find(n => !GROUP_NAME_RE.test(n) || n.toLowerCase() === me.toLowerCase() || n.toLowerCase() === 'you');
+      if (badName !== undefined) return toast(`"${badName}" is not allowed (letters, numbers, spaces, . and -, max 20, not a duplicate of you)`, 'error');
+      if (others.length > 7) return toast('A group can have at most 8 people including you', 'error');
+      const removed = g.members.filter(m => m !== me && !others.includes(m));
+      const inUse = removed.find(m => state.expenses.some(e => e.split && e.split.members.includes(m)));
+      if (inUse !== undefined) return toast(`${inUse} is part of existing split expenses and can't be removed`, 'error');
+      state.group = { name, members: [me, ...others] };
+      saveState(); closeModal(); render(); toast('Group updated', 'success');
+    });
+  });
+}

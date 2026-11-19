@@ -123,45 +123,18 @@ function buildSeed() {
     { id:'med_'+uid(), name:'Montelukast', salt:'Montelukast 10mg', dosage:'1 tablet', frequency:'daily', times:['21:00'], startDate: daysAgoISO(45), endDate: null, refillDate: daysAgoISO(-12), stock: 5, active:true, log: { [todayISO()]: {} } }
   ];
 
-  const genericMeds = [
-    { salt:'Paracetamol 500mg', brand:'Dolo 650', brandPrice:32, jakBrand:'Paracetamol IP 500mg', jakPrice:12, pack:'15 tabs' },
-    { salt:'Salbutamol 100mcg', brand:'Asthalin Inhaler', brandPrice:180, jakBrand:'Salbutamol Inhaler', jakPrice:65, pack:'1 inhaler' },
-    { salt:'Metformin 500mg', brand:'Glycomet 500', brandPrice:85, jakBrand:'Metformin HCl 500mg', jakPrice:22, pack:'20 tabs' },
-    { salt:'Atorvastatin 10mg', brand:'Atorva 10', brandPrice:180, jakBrand:'Atorvastatin 10mg', jakPrice:48, pack:'15 tabs' },
-    { salt:'Amoxicillin 500mg', brand:'Moxikind 500', brandPrice:120, jakBrand:'Amoxicillin 500mg', jakPrice:45, pack:'10 caps' },
-    { salt:'Omeprazole 20mg', brand:'Omez 20', brandPrice:92, jakBrand:'Omeprazole 20mg', jakPrice:28, pack:'15 caps' },
-    { salt:'Amlodipine 5mg', brand:'Amlong 5', brandPrice:65, jakBrand:'Amlodipine 5mg', jakPrice:18, pack:'15 tabs' },
-    { salt:'Montelukast 10mg', brand:'Montair 10', brandPrice:220, jakBrand:'Montelukast 10mg', jakPrice:78, pack:'15 tabs' },
-    { salt:'Cetirizine 10mg', brand:'Cetzine 10', brandPrice:45, jakBrand:'Cetirizine 10mg', jakPrice:14, pack:'10 tabs' },
-    { salt:'Pantoprazole 40mg', brand:'Pan 40', brandPrice:135, jakBrand:'Pantoprazole 40mg', jakPrice:42, pack:'15 tabs' },
-    { salt:'Metoprolol 25mg', brand:'Metolar 25', brandPrice:78, jakBrand:'Metoprolol 25mg', jakPrice:24, pack:'15 tabs' },
-    { salt:'Levothyroxine 50mcg', brand:'Thyronorm 50', brandPrice:165, jakBrand:'Levothyroxine 50mcg', jakPrice:58, pack:'120 tabs' },
-    { salt:'Ibuprofen 400mg', brand:'Brufen 400', brandPrice:58, jakBrand:'Ibuprofen 400mg', jakPrice:18, pack:'15 tabs' },
-    { salt:'Azithromycin 500mg', brand:'Azithral 500', brandPrice:145, jakBrand:'Azithromycin 500mg', jakPrice:62, pack:'5 tabs' },
-    { salt:'Ranitidine 150mg', brand:'Rantac 150', brandPrice:42, jakBrand:'Ranitidine 150mg', jakPrice:12, pack:'15 tabs' },
-  ];
 
-  const kendras = [
-    { id:'k1', name:'Jan Aushadhi — Kothrud', address:'Shop 12, Paud Road, Kothrud, Pune 411038', lat:18.5074, lng:73.8077, timings:'9:00 AM – 9:00 PM' },
-    { id:'k2', name:'Jan Aushadhi — FC Road', address:'Near Vaishali, FC Road, Pune 411004', lat:18.5236, lng:73.8478, timings:'8:00 AM – 10:00 PM' },
-    { id:'k3', name:'Jan Aushadhi — Aundh', address:'ITI Road, Aundh, Pune 411007', lat:18.5590, lng:73.8087, timings:'9:00 AM – 9:00 PM' },
-    { id:'k4', name:'Jan Aushadhi — Viman Nagar', address:'Phoenix Mall Road, Viman Nagar, Pune 411014', lat:18.5679, lng:73.9143, timings:'10:00 AM – 9:00 PM' },
-    { id:'k5', name:'Jan Aushadhi — Hinjewadi', address:'Phase 2, Hinjewadi, Pune 411057', lat:18.5913, lng:73.7389, timings:'9:00 AM – 8:00 PM' },
-    { id:'k6', name:'Jan Aushadhi — Hadapsar', address:'Sayyed Nagar, Hadapsar, Pune 411028', lat:18.5089, lng:73.9260, timings:'9:00 AM – 9:00 PM' },
-    { id:'k7', name:'Jan Aushadhi — Katraj', address:'Katraj Chowk, Pune 411046', lat:18.4575, lng:73.8557, timings:'8:00 AM – 8:00 PM' },
-    { id:'k8', name:'Jan Aushadhi — Pimpri', address:'Pimpri Chinchwad, Pune 411017', lat:18.6287, lng:73.8000, timings:'9:00 AM – 9:00 PM' },
-  ];
 
   return {
-    user: { name:'Aarav Sharma', email:'aarav@demo.nivora', avatarInitials:'AS', largeText:false, notifications:true, lowBalanceThreshold:1000, location:{ lat:18.5074, lng:73.8077 } },
+    user: { name:'Aarav Sharma', email:'aarav@demo.nivora', avatarInitials:'AS', largeText:false, notifications:true, lowBalanceThreshold:1000 },
     budgets: { Food:6000, Rent:8500, Utilities:1800, Transport:1200, Health:2500, Entertainment:1000, Other:4000 },
     totalBudgetMonthly: 25000,
-    expenses, medicines, genericMeds, kendras, savingsTracker: [], notifications: [],
+    expenses, medicines, notifications: [],
     profiles: { 'aarav@demo.nivora': { ...blankProfile(), dob:'1996-04-12', gender:'Male', phone:'+91 98765 43210', city:'Pune', bloodGroup:'B+', emergencyName:'Meera Sharma', emergencyRelation:'Mother', emergencyPhone:'+91 98765 00000', monthlyIncome:'45000', goals:['Track daily expenses','Get medicine reminders'], onboarded:true } },
   };
 }
 
-const STORE_KEY = 'nivora_v1';
+let STORE_KEY = null;                        // set when an account is opened: nivora_state_<id>
 let state = null;
 let currentUser = null;
 
@@ -190,6 +163,7 @@ const MIGRATIONS = {
 function migrateState(s) {
   let v = Number(s.schemaVersion) || 1;
   while (v < SCHEMA_VERSION) { v++; if (MIGRATIONS[v]) s = MIGRATIONS[v](s); }
+  delete s.kendras; delete s.genericMeds; delete s.savingsTracker; if (s.user) delete s.user.location;   // removed features
   s.schemaVersion = SCHEMA_VERSION;
   return s;
 }
@@ -197,76 +171,56 @@ function freshState() { const s = buildSeed(); s.schemaVersion = SCHEMA_VERSION;
 
 let storageWarned = false;
 function loadState() { try { const raw = store.get(STORE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; } }
-function saveState() {
+function persistLocal() {
+  if (!STORE_KEY) return true;               // signed-out guest state is never written to disk
   if (!store.set(STORE_KEY, JSON.stringify(state)) && !storageWarned) {
     storageWarned = true;
     toast('Storage is unavailable — changes will be lost when you close this tab', 'warning');
+    return false;
   }
+  return true;
+}
+function saveState() {
+  persistLocal();
+  if (typeof NativeAlarms !== 'undefined') NativeAlarms.requestSync(); // keep OS alarms in step with the data
 }
 function resetDemo() { store.remove(STORE_KEY); state = freshState(); saveState(); toast('Demo data reset','success'); render(); }
 
 /* LEGACY one-time wipe for data written before v1.5 (its shape is unknown). Do NOT bump this
    constant for future changes - use SCHEMA_VERSION + MIGRATIONS above instead. */
-const LEGACY_SEED_VERSION = 'v1.5';
-if (store.get('nivora_seed_ver') !== LEGACY_SEED_VERSION) {
-  store.remove(STORE_KEY);
-  store.set('nivora_seed_ver', LEGACY_SEED_VERSION);
-}
-{
-  const loaded = loadState();
-  state = (loaded && loaded.user) ? migrateState(loaded) : freshState();
-  saveState();
-}
+state = blankState({ name: '', email: '' });   // signed-out placeholder; never written to disk (account is opened in 10-account.js)
 if (state.user.largeText) document.documentElement.classList.add('large-text');
 
+/* Identity helpers. The demo seed has no meKey/group, so it keeps its legacy Aarav / Flat 302 identity;
+   real accounts get meKey 'You' and their own editable group. */
+const ME = () => (state && state.user && state.user.meKey) || 'Aarav';
+const groupInfo = () => (state && state.group) || { name: 'Flat 302', members: ['Aarav', 'Rohan', 'Priya'] };
+const groupMembers = () => groupInfo().members;
+const groupName = () => groupInfo().name;
+
+const APP_VERSION = '1.0.0';
 const DEMO_USER = { name: 'Aarav Sharma', email: 'aarav@demo.nivora' };
-const initialsOf = n => n.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
-function syncUser(email, username) {
-  state.user.name = username;
-  state.user.email = email;
-  state.user.avatarInitials = initialsOf(username);
-  saveState();
+const profileKeyFor = u => String((u && u.email) || '').toLowerCase();   // key of the user's entry in state.profiles
+function initialsOf(n) { return String(n || '').split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'; }
+function titleCase(t) { return String(t).replace(/[._-]+/g, ' ').replace(/\b\p{L}/gu, c => c.toUpperCase()); }
+
+/* ---- Accounts (stored on this device only) ---- */
+function ensureExt() {
+  state.ext = Object.assign({ balance:null, lowAt:1000, bills:[], caregiver:{name:'',phone:''}, upi:{}, alerted:{} }, state.ext || {});
 }
-function login(email, username = DEMO_USER.name) {
-  currentUser = { email, username };
-  syncUser(email, username);
-  ssSet('nivora_auth', email);
-  ssSet('nivora_auth_username', username);
-  toast(`Welcome, ${username} 👋`, 'success');
-  if (!getProfile()) { setProfile(blankProfile()); obReset(); navigate('/onboarding'); return; }
-  navigate('/dashboard');
-}
-function logout() { closeModal(); currentUser = null; ssRemove('nivora_auth'); ssRemove('nivora_auth_username'); navigate('/login'); }
-const saved = ssGet('nivora_auth');
-if (saved) {
-  currentUser = { email: saved, username: ssGet('nivora_auth_username') || DEMO_USER.name };
-  syncUser(currentUser.email, currentUser.username);
+function applyUiPrefs() { document.documentElement.classList.toggle('large-text', !!(state.user && state.user.largeText)); }
+/* A new profile starts EMPTY (no demo data). */
+function blankState({ name, email, consentAt }) {
+  const seed = buildSeed();
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    user: { name, email, avatarInitials: initialsOf(name), meKey: 'You', largeText: false, notifications: true,
+            lowBalanceThreshold: 1000, consentAt: consentAt || null },
+    budgets: seed.budgets, totalBudgetMonthly: seed.totalBudgetMonthly,
+    expenses: [], medicines: [], notifications: [],
+    group: { name: 'My group', members: ['You'] },
+    profiles: {},
+  };
 }
 
-function handleLogin() {
-  const id = $('#loginId').value.trim().replace(/\s+/g, ' ');
-  const password = $('#loginPassword').value;
-  if (!id) return toast('Please enter your username or email ID', 'error');
-  if (password !== 'demo1234') return toast('Incorrect password. Use demo1234', 'error');
-  const titleCase = t => t.replace(/[._-]+/g, ' ').replace(/\b\p{L}/gu, c => c.toUpperCase());
-  let email, username;
-  if (id.includes('@')) {
-    email = id;
-    username = email.toLowerCase() === DEMO_USER.email.toLowerCase()
-      ? DEMO_USER.name : titleCase(email.split('@')[0]);
-  } else {
-    const known = id.toLowerCase() === DEMO_USER.name.toLowerCase() || id.toLowerCase() === DEMO_USER.name.split(' ')[0].toLowerCase();
-    username = known ? DEMO_USER.name : titleCase(id);
-    email = known ? DEMO_USER.email : `${id.toLowerCase().replace(/\s+/g, '.')}@demo.nivora`;
-  }
-  login(email, username);
-}
-
-function handleSignup() {
-  const name = $('#signupName').value.trim().replace(/\s+/g, ' ').replace(/\b\p{L}/gu, c => c.toUpperCase());
-  const email = $('#signupEmail').value.trim();
-  if (!name || !email) return toast('Please fill in all fields', 'error');
-  if ($('#signupPassword').value.length < 8) return toast('Password must be at least 8 characters', 'error');
-  login(email, name);
-}
 
