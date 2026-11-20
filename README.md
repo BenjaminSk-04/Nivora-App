@@ -17,7 +17,8 @@ account, and no tracking.
   off it on-device (via OCR) and pre-fills the expense form, auto-categorized
 - Monthly budgets per category, with automatic redistribution when you change
   your total budget
-- Flatmate/group bill splitting
+- Flatmate/group bill splitting — name your own group and add/remove real
+  flatmates any time (Splits → Manage); nothing is pre-filled with sample people
 - Spending insights: category breakdown, trends, balance forecast
 
 **Health**
@@ -32,7 +33,19 @@ account, and no tracking.
   restore it later (Settings → Backup & Restore)
 - Light/large-text accessibility toggle
 
-### Removed from the original prototype
+### Starts empty
+
+A fresh install has no expenses, no medicines, and no flatmates — a real
+person's app shouldn't come pre-loaded with someone else's sample data. The
+only defaults are starting monthly budget numbers (you can edit or zero these
+out any time in Budgets). This was also an architectural fix, not just a data
+one: the original prototype had the demo person's name hard-coded as the
+identity used throughout the splitting/expense logic, which only worked
+because the sample data matched it. That's been replaced with a stable
+internal "you" identity that's independent of your display name, and the
+group name + flatmates are now data you manage yourself (Splits → Manage).
+
+## Removed from the original prototype
 
 Per the project owner's request, two features from the original prototype are
 **not** part of this app and have been fully removed from the code (not just

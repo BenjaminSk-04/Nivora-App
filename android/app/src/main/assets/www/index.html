@@ -120,52 +120,26 @@ function autoCategorize(notes='') {
   return 'Other';
 }
 
+/* The signed-in user is always represented internally by this fixed key — never by their
+   display name, which can change. This keeps old records (who paid, who owes whom) stable
+   even if the person later edits their name in Settings. displayName()/nameOf() below turn
+   it back into something human for the UI. */
+const ME = '__me__';
+function displayName(key) { return key === ME ? (state.user.name || 'You') : key; }
+function nameOf(key) { return key === ME ? 'You' : key; }
+function membersList() { return [ME, ...(state.flatmates || [])]; }
+
+/* A brand-new install starts completely empty — no sample expenses, no sample
+   medicines, no fictional flatmates. Real users don't want someone else's demo
+   data sitting in their app. Budgets keep sensible starting numbers (you can
+   change or zero them out in Budgets any time); everything else starts blank. */
 function buildSeed() {
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
-  const thisDay = d => `${y}-${pad(m+1)}-${pad(Math.min(d, now.getDate()))}`;
-  const lmDate = new Date(y, m-1, 1);
-  const lastDay = d => `${lmDate.getFullYear()}-${pad(lmDate.getMonth()+1)}-${pad(d)}`;
-
-  const G = ['Aarav','Rohan','Priya'];
-  const exp = (o) => ({ id: 'exp_'+uid(), receipt:null, split:null, ...o });
-
-  const expenses = [
-    exp({ amount:2800, category:'Food', date:thisDay(3), notes:'BigBasket groceries', paidBy:'Aarav' }),
-    exp({ amount:1800, category:'Food', date:thisDay(7), notes:'Swiggy dinner', paidBy:'Aarav' }),
-    exp({ amount:400,  category:'Food', date:thisDay(11), notes:'Chai & snacks', paidBy:'Aarav' }),
-    exp({ amount:1500, category:'Health', date:thisDay(9), notes:'Salbutamol + Montelukast', paidBy:'Aarav' }),
-    exp({ amount:800,  category:'Transport', date:thisDay(8), notes:'Uber to office', paidBy:'Aarav' }),
-    exp({ amount:500,  category:'Entertainment', date:thisDay(12), notes:'Netflix personal', paidBy:'Aarav' }),
-    exp({ amount:1200, category:'Other', date:thisDay(14), notes:'Haircut + misc', paidBy:'Aarav' }),
-    
-    exp({ amount:1500, category:'Food', date:thisDay(2), notes:'Groceries (Flat 302)', paidBy:'Aarav', split:{ members:G, mode:'equal', shares:{ Aarav:500, Rohan:500, Priya:500 } } }),
-    exp({ amount:1200, category:'Utilities', date:thisDay(5), notes:'MSEB electricity', paidBy:'Rohan', split:{ members:G, mode:'equal', shares:{ Aarav:400, Rohan:400, Priya:400 } } }),
-    exp({ amount:450,  category:'Utilities', date:thisDay(6), notes:'JioFiber Wi-Fi', paidBy:'Priya', split:{ members:G, mode:'equal', shares:{ Aarav:150, Rohan:150, Priya:150 } } }),
-    exp({ amount:24000, category:'Rent', date:thisDay(1), notes:'Flat 302 rent', paidBy:'Aarav', split:{ members:G, mode:'equal', shares:{ Aarav:8000, Rohan:8000, Priya:8000 } } }),
-    exp({ amount:600,  category:'Utilities', date:thisDay(4), notes:'Water tanker', paidBy:'Rohan', split:{ members:G, mode:'equal', shares:{ Aarav:200, Rohan:200, Priya:200 } } }),
-    exp({ amount:450,  category:'Entertainment', date:thisDay(10), notes:'Netflix shared', paidBy:'Priya', split:{ members:G, mode:'equal', shares:{ Aarav:150, Rohan:150, Priya:150 } } }),
-
-    exp({ amount:3760, category:'Food', date:lastDay(3), notes:'Food last month', paidBy:'Aarav' }),
-    exp({ amount:8000, category:'Rent', date:lastDay(1), notes:'Rent last month', paidBy:'Aarav' }),
-    exp({ amount:1500, category:'Utilities', date:lastDay(4), notes:'Utilities last mo', paidBy:'Aarav' }),
-    exp({ amount:700,  category:'Transport', date:lastDay(5), notes:'Transport last mo', paidBy:'Aarav' }),
-    exp({ amount:2000, category:'Health', date:lastDay(6), notes:'Meds last month', paidBy:'Aarav' }),
-    exp({ amount:600,  category:'Entertainment', date:lastDay(7), notes:'Fun last mo', paidBy:'Aarav' }),
-    exp({ amount:900,  category:'Other', date:lastDay(8), notes:'Misc last mo', paidBy:'Aarav' }),
-  ];
-
-  const medicines = [
-    { id:'med_'+uid(), name:'Salbutamol Inhaler', salt:'Salbutamol 100mcg', dosage:'2 puffs', frequency:'daily', times:['21:00'], startDate: daysAgoISO(60), endDate: null, refillDate: daysAgoISO(-8), stock: 3, active:true, log: { [todayISO()]: {} } },
-    { id:'med_'+uid(), name:'Azithromycin', salt:'Azithromycin 500mg', dosage:'1 tablet', frequency:'daily', times:['08:00', '20:00'], startDate: daysAgoISO(2), endDate: daysAgoISO(-3), refillDate: null, stock: 4, active:true, log: { [todayISO()]: {} } },
-    { id:'med_'+uid(), name:'Montelukast', salt:'Montelukast 10mg', dosage:'1 tablet', frequency:'daily', times:['21:00'], startDate: daysAgoISO(45), endDate: null, refillDate: daysAgoISO(-12), stock: 5, active:true, log: { [todayISO()]: {} } }
-  ];
-
   return {
-    user: { name:'', email:'', avatarInitials:'', largeText:false, notifications:true, lowBalanceThreshold:1000, location:{ lat:18.5074, lng:73.8077 } },
+    user: { name:'', email:'', avatarInitials:'', largeText:false, notifications:true, lowBalanceThreshold:1000 },
     budgets: { Food:6000, Rent:8500, Utilities:1800, Transport:1200, Health:2500, Entertainment:1000, Other:4000 },
     totalBudgetMonthly: 25000,
-    expenses, medicines, savingsTracker: [], notifications: [],
+    expenses: [], medicines: [], savingsTracker: [], notifications: [],
+    flatmates: [], groupName: '',
     profiles: {},
   };
 }
@@ -184,12 +158,31 @@ const store = {
 
 /* Schema versioning: bump SCHEMA_VERSION when the stored shape changes and add a step to
    MIGRATIONS[newVersion] that mutates/returns the old state. User data is never wiped. */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const MIGRATIONS = {
   2: s => { // per-account profiles; existing account counts as already onboarded
     s.profiles = s.profiles || {};
     const key = String(s.user?.email || '').toLowerCase();
     if (key && !s.profiles[key]) s.profiles[key] = { ...blankProfile(), onboarded: true };
+    return s;
+  },
+  3: s => { // "me" is now a stable internal key (ME) instead of the hardcoded demo
+            // name 'Aarav', and flatmates/group name are real, user-managed data.
+    const LEGACY_ME = 'Aarav';
+    const foundFlatmates = new Set();
+    for (const e of (s.expenses || [])) {
+      if (e.paidBy === LEGACY_ME) e.paidBy = ME;
+      if (e.split) {
+        e.split.members = (e.split.members || []).map(m => m === LEGACY_ME ? ME : m);
+        if (e.split.shares && Object.prototype.hasOwnProperty.call(e.split.shares, LEGACY_ME)) {
+          e.split.shares[ME] = e.split.shares[LEGACY_ME];
+          delete e.split.shares[LEGACY_ME];
+        }
+        for (const m of e.split.members) if (m !== ME) foundFlatmates.add(m);
+      }
+    }
+    if (!Array.isArray(s.flatmates)) s.flatmates = [...foundFlatmates];
+    if (typeof s.groupName !== 'string') s.groupName = '';
     return s;
   },
 };
@@ -209,7 +202,7 @@ function saveState() {
     toast('Storage is unavailable — changes will be lost when you close this tab', 'warning');
   }
 }
-function resetDemo() { store.remove(STORE_KEY); state = freshState(); saveState(); toast('Demo data reset','success'); render(); }
+function clearAllData() { store.remove(STORE_KEY); state = freshState(); saveState(); obReset(); navigate('/onboarding'); toast('All data cleared', 'success'); }
 
 /* LEGACY one-time wipe for data written before v1.5 (its shape is unknown). Do NOT bump this
    constant for future changes - use SCHEMA_VERSION + MIGRATIONS above instead. */
@@ -440,10 +433,14 @@ function fireReminder(title, body) {
 }
 
 function computeBalances(expenses, members) {
-  const bal = Object.fromEntries(members.map(m => [m, 0]));
+  // Union with everyone who actually appears in a historical split, so a flatmate who was
+  // later removed from the group doesn't silently vanish from (or corrupt) past balances.
+  const all = new Set(members);
+  for (const e of expenses) if (e.split) for (const m of e.split.members) all.add(m);
+  const bal = Object.fromEntries([...all].map(m => [m, 0]));
   for (const e of expenses) {
     if (!e.split) continue;
-    for (const m of e.split.members) bal[m] -= (e.split.shares[m] || 0);
+    for (const m of e.split.members) bal[m] = (bal[m] || 0) - (e.split.shares[m] || 0);
     bal[e.paidBy] = (bal[e.paidBy] || 0) + e.amount;
   }
   for (const k of Object.keys(bal)) bal[k] = Number(bal[k].toFixed(2));
@@ -515,7 +512,7 @@ function adherence() {
   return total ? Math.round((taken / total) * 100) : 0;
 }
 
-function myShare(e) { if (e.settlement) return 0; if (e.split) return e.split.shares.Aarav || 0; return (e.paidBy && e.paidBy !== 'Aarav') ? 0 : e.amount; }
+function myShare(e) { if (e.settlement) return 0; if (e.split) return e.split.shares[ME] || 0; return (e.paidBy && e.paidBy !== ME) ? 0 : e.amount; }
 function expensesThisMonth() { return state.expenses.filter(e => monthKey(e.date) === thisMonthKey()); }
 function expensesPrevMonth() { return state.expenses.filter(e => monthKey(e.date) === prevMonthKey()); }
 function totalSpentThisMonth() { return expensesThisMonth().reduce((s,e) => s + myShare(e), 0); }
@@ -550,7 +547,6 @@ function categorySpentPrevMonth() {
   for (const e of expensesPrevMonth()) map[e.category] = (map[e.category] || 0) + myShare(e);
   return map;
 }
-const FLAT_MEMBERS = ['Aarav','Rohan','Priya'];
 
 function progressBar(pct, color) {
   return `<div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden"><div class="h-full rounded-full transition-all duration-500" style="width:${Math.min(pct,100)}%;background:${color}"></div></div>`;
@@ -800,7 +796,7 @@ views['/dashboard'] = () => {
             <div class="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold" style="background:${catColor(e.category)}">${e.category[0]}</div>
             <div class="min-w-0">
               <p class="font-medium text-slate-900 truncate">${esc(e.notes || e.category)}</p>
-              <p class="text-xs text-slate-500">${fmtDay(e.date)} · ${esc(e.paidBy)} paid</p>
+              <p class="text-xs text-slate-500">${fmtDay(e.date)} · ${esc(nameOf(e.paidBy))} paid</p>
             </div>
           </div>
           <span class="font-bold text-slate-900">${fmtINR(myShare(e))}</span>
@@ -846,7 +842,7 @@ function expenseListHTML() {
                   <div class="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold flex-shrink-0" style="background:${catColor(e.category)}">${e.category[0]}</div>
                   <div class="min-w-0 flex-1">
                     <p class="font-medium text-slate-900 truncate">${esc(e.notes || e.category)}</p>
-                    <p class="text-xs text-slate-500">${e.category} · ${fmtDay(e.date)} · ${esc(e.paidBy)} paid ${e.split ? '· shared' : ''}</p>
+                    <p class="text-xs text-slate-500">${e.category} · ${fmtDay(e.date)} · ${esc(nameOf(e.paidBy))} paid ${e.split ? '· shared' : ''}</p>
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -966,10 +962,22 @@ views['/budgets'] = () => {
 };
 
 views['/splits'] = () => {
+  if (!state.flatmates.length) {
+    return `
+    <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Money</h1>
+    ${tabBar('/splits', MONEY_TABS)}
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center space-y-3">
+      <p class="text-4xl">🏠</p>
+      <h2 class="font-bold text-slate-900">Add your flatmates to start splitting bills</h2>
+      <p class="text-sm text-slate-500">Once you add the people you share expenses with, you can split rent, groceries and bills and keep track of who owes whom.</p>
+      <button onclick="openManageGroup()" class="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-5 py-2.5 rounded-xl">+ Add flatmates</button>
+    </div>`;
+  }
+
   const gExps = state.expenses.filter(e => e.split).sort((a,b) => b.date.localeCompare(a.date));
-  const balances = computeBalances(gExps, FLAT_MEMBERS);
+  const balances = computeBalances(gExps, membersList());
   const settlements = settleUp(balances);
-  const myBalance = balances.Aarav;
+  const myBalance = balances[ME] || 0;
 
   return `
   <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-4">Money</h1>
@@ -979,20 +987,21 @@ views['/splits'] = () => {
       <div class="flex items-center justify-between mb-3">
         <div>
           <p class="text-xs uppercase opacity-80 font-semibold tracking-wide">Group</p>
-          <h2 class="text-xl font-extrabold">🏠 Flat 302</h2>
+          <h2 class="text-xl font-extrabold">🏠 ${esc(state.groupName || 'Shared expenses')}</h2>
         </div>
+        <button onclick="openManageGroup()" class="text-xs font-medium bg-white/20 hover:bg-white/30 rounded-lg px-2.5 py-1.5">Manage</button>
       </div>
       <p class="text-sm opacity-90">${myBalance >= 0 ? 'You are owed' : 'You owe'}</p>
       <p class="text-3xl font-extrabold mt-1">${fmtINR2(Math.abs(myBalance))}</p>
     </div>
 
     <div class="grid grid-cols-3 gap-3">
-      ${FLAT_MEMBERS.map(m => {
+      ${membersList().map(m => {
         const b = balances[m] || 0;
-        const isMe = m === 'Aarav';
+        const isMe = m === ME;
         const color = b > 0.01 ? 'text-teal-700' : b < -0.01 ? 'text-red-600' : 'text-slate-500';
         return `<div class="bg-white rounded-xl p-3 shadow-sm border ${isMe ? 'border-teal-300' : 'border-slate-100'} text-center">
-          <p class="text-xs font-semibold text-slate-500">${isMe ? 'You' : m}</p>
+          <p class="text-xs font-semibold text-slate-500">${esc(nameOf(m))}</p>
           <p class="font-extrabold text-lg ${color} mt-1">${b > 0 ? '+' : ''}${fmtINR(Math.abs(b))}</p>
           <p class="text-[10px] text-slate-400">${b > 0 ? 'owed' : b < 0 ? 'owes' : 'settled'}</p>
         </div>`;
@@ -1006,14 +1015,14 @@ views['/splits'] = () => {
       <ul class="divide-y divide-slate-100">
         ${settlements.map((s,i) => `<li class="p-4 flex flex-wrap items-center justify-between gap-2">
           <div class="flex items-center gap-2">
-            <div class="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold">${s.from[0]}</div>
+            <div class="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold">${esc(nameOf(s.from)[0])}</div>
             <span class="text-slate-500 text-sm">→</span>
-            <div class="w-7 h-7 rounded-full bg-teal-200 flex items-center justify-center text-xs font-bold text-teal-800">${s.to[0]}</div>
-            <span class="text-sm text-slate-700 ml-1">${s.from} pays ${s.to}</span>
+            <div class="w-7 h-7 rounded-full bg-teal-200 flex items-center justify-center text-xs font-bold text-teal-800">${esc(nameOf(s.to)[0])}</div>
+            <span class="text-sm text-slate-700 ml-1">${esc(nameOf(s.from))} pays ${esc(nameOf(s.to))}</span>
           </div>
           <div class="flex items-center gap-2">
             <span class="font-bold text-slate-900">${fmtINR2(s.amount)}</span>
-            ${settleExtraHTML(s)}<button onclick="markSettled('${s.from}','${s.to}',${s.amount})" class="text-xs font-medium bg-teal-600 text-white px-2 py-1 rounded">Mark paid</button>
+            ${settleExtraHTML(s)}<button onclick="markSettled('${esc(s.from)}','${esc(s.to)}',${s.amount})" class="text-xs font-medium bg-teal-600 text-white px-2 py-1 rounded">Mark paid</button>
           </div>
         </li>`).join('')}
       </ul>
@@ -1200,7 +1209,7 @@ views['/settings'] = () => `
     </div>
     <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 space-y-2">
       <h2 class="font-bold text-slate-900 mb-2">Data & Privacy</h2>
-      <button onclick="confirmReset()" class="w-full text-left py-2 text-slate-700 hover:text-teal-700 font-medium">🔄 Reset demo data</button>
+      <button onclick="confirmReset()" class="w-full text-left py-2 text-red-600 hover:text-red-700 font-medium">🗑️ Clear all data</button>
       <button onclick="confirmResetProfile()" class="w-full text-left py-2 text-red-600 hover:text-red-700 font-medium">🚪 Reset profile</button>
     </div>
     <p class="text-xs text-slate-400 text-center pb-6">Nivora v1.0</p>
@@ -1308,12 +1317,12 @@ function openAddExpense(isGroup = false) {
       <label class="block ${isGroup ? '' : 'hidden'}" id="paidByWrap">
         <span class="text-sm font-medium text-slate-700">Paid by</span>
         <select name="paidBy" class="mt-1 w-full px-3 py-2.5 border border-slate-300 rounded-lg">
-          ${FLAT_MEMBERS.map(m => `<option>${m}</option>`).join('')}
+          ${membersList().map(m => `<option value="${esc(m)}">${esc(nameOf(m))}</option>`).join('')}
         </select>
       </label>
-      ${!isGroup ? `<label class="flex items-center gap-2 mt-2 cursor-pointer">
+      ${(!isGroup && state.flatmates.length) ? `<label class="flex items-center gap-2 mt-2 cursor-pointer">
         <input type="checkbox" name="split" class="w-4 h-4" onchange="document.getElementById('paidByWrap').classList.toggle('hidden', !this.checked)"/>
-        <span class="text-sm font-medium text-slate-700">Split with Flat 302</span>
+        <span class="text-sm font-medium text-slate-700">Split with ${esc(state.groupName || 'the group')}</span>
       </label>` : ''}
       <div class="flex gap-2 pt-2">
         <button type="button" onclick="closeModal()" class="flex-1 border border-slate-300 text-slate-700 font-medium py-2.5 rounded-lg">Cancel</button>
@@ -1332,11 +1341,13 @@ function openAddExpense(isGroup = false) {
       const shouldSplit = isGroup || fd.get('split') === 'on';
       if (!(amount > 0)) return toast('Enter an amount greater than 0', 'error');
       
-      const exp = { id: 'exp_'+uid(), amount, category, date: fd.get('date') || todayISO(), notes: (fd.get('notes') || '').trim(), paidBy: shouldSplit ? fd.get('paidBy') : 'Aarav', receipt: null, split: null };
+      const exp = { id: 'exp_'+uid(), amount, category, date: fd.get('date') || todayISO(), notes: (fd.get('notes') || '').trim(), paidBy: shouldSplit ? fd.get('paidBy') : ME, receipt: null, split: null };
       
       if (shouldSplit) {
-        const per = Math.round((amount / 3) * 100) / 100;
-        exp.split = { members: FLAT_MEMBERS, mode:'equal', shares: { Aarav: per, Rohan: per, Priya: Math.round((amount - per*2) * 100) / 100 } };
+        const members = membersList();
+        const parts = splitShares(amount, 'equal', members.map(() => 1));
+        const shares = {}; members.forEach((n, i) => shares[n] = parts[i]);
+        exp.split = { members, mode:'equal', shares };
       }
       
       state.expenses.push(exp);
@@ -1633,11 +1644,11 @@ function openEditBudget(cat) {
 }
 
 function confirmReset() {
-  openModal('Reset demo data?', `
-    <p class="text-slate-600 mb-4">This will erase all expenses, medicines, and savings.</p>
+  openModal('Clear all data?', `
+    <p class="text-slate-600 mb-4">This permanently erases every expense, medicine, budget and your profile from this device, and takes you back through setup. Back up your data first from Settings if you want a copy.</p>
     <div class="flex gap-2">
       <button onclick="closeModal()" class="flex-1 border py-2.5 rounded-lg">Cancel</button>
-      <button onclick="resetDemo();closeModal()" class="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-lg">Reset</button>
+      <button onclick="clearAllData();closeModal()" class="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-lg">Clear everything</button>
     </div>`);
 }
 /* ---------- Backup & Restore ----------
@@ -1796,7 +1807,7 @@ const numOf = v => { const n = Number(String(v).replace(/,/g,'')); return Number
 const catOptions = sel => CATEGORIES.map(c => `<option value="${c}" ${c===sel?'selected':''}>${CATEGORY_META[c].icon} ${c}</option>`).join('');
 const inCls = 'mt-1 w-full px-3 py-2.5 border border-slate-300 rounded-lg';
 function pushExpense(o) {
-  state.expenses.push({ id:'exp_'+uid(), receipt:null, split:null, paidBy:'Aarav', date:todayISO(), ...o });
+  state.expenses.push({ id:'exp_'+uid(), receipt:null, split:null, paidBy:ME, date:todayISO(), ...o });
   saveState();
   const over = categorySpentThisMonth()[o.category] > (state.budgets[o.category] || Infinity);
   toast(over ? `Added ${fmtINR(o.amount)} — over your ${o.category} budget` : `Added ${fmtINR(o.amount)} · ${o.category}`, over ? 'warning' : 'success');
@@ -1942,7 +1953,7 @@ function markBillPaid(id) {
   const b = ext().bills.find(x => x.id === id); if (!b) return;
   b.paidMonth = thisMonthKey();
   if (ext().balance != null) ext().balance -= b.amount;
-  state.expenses.push({ id:'exp_'+uid(), amount:b.amount, category:autoCategorize(b.title), date:todayISO(), notes:b.title, paidBy:'Aarav', receipt:null, split:null });
+  state.expenses.push({ id:'exp_'+uid(), amount:b.amount, category:autoCategorize(b.title), date:todayISO(), notes:b.title, paidBy:ME, receipt:null, split:null });
   saveState(); render(); openBills();
 }
 function deleteBill(id) { ext().bills = ext().bills.filter(x => x.id !== id); saveState(); render(); openBills(); }
@@ -1966,44 +1977,103 @@ function splitShares(amount, mode, w) {
   return out;
 }
 function openSplitExpense() {
+  if (!state.flatmates.length) return openManageGroup();
+  const members = membersList();
   openModal('Add shared expense', `<form id="spForm" class="space-y-3">
     <label class="block text-sm font-medium">Amount (₹)<input name="amount" type="number" step="0.01" min="1" required class="${inCls}"/></label>
     <label class="block text-sm font-medium">Notes<input name="notes" class="${inCls}" placeholder="e.g. Electricity bill"/></label>
     <div class="grid grid-cols-2 gap-3">
       <label class="block text-sm font-medium">Category<select name="category" class="${inCls}">${catOptions('Other')}</select></label>
-      <label class="block text-sm font-medium">Paid by<select name="paidBy" class="${inCls}">${FLAT_MEMBERS.map(m => `<option>${m}</option>`).join('')}</select></label>
+      <label class="block text-sm font-medium">Paid by<select name="paidBy" class="${inCls}">${members.map(m => `<option value="${esc(m)}">${esc(nameOf(m))}</option>`).join('')}</select></label>
     </div>
     <label class="block text-sm font-medium">Split<select name="mode" id="spMode" class="${inCls}">
       <option value="equal">Equally</option><option value="percent">By percentage</option><option value="shares">By shares</option></select></label>
-    <div id="spRows" class="hidden grid grid-cols-3 gap-2">${FLAT_MEMBERS.map(m => `<label class="text-xs font-medium">${m}<input data-w type="number" step="0.01" min="0" class="${inCls}"/></label>`).join('')}</div>
+    <div id="spRows" class="hidden grid grid-cols-3 gap-2">${members.map(m => `<label class="text-xs font-medium">${esc(nameOf(m))}<input data-w type="number" step="0.01" min="0" class="${inCls}"/></label>`).join('')}</div>
     <p id="spHint" class="text-xs text-slate-500"></p>
     <button class="w-full bg-teal-600 text-white font-semibold py-2.5 rounded-lg">Save shared expense</button></form>`, root => {
     const mode = root.querySelector('#spMode'), rows = root.querySelector('#spRows'), hint = root.querySelector('#spHint');
     const sync = () => {
       rows.classList.toggle('hidden', mode.value === 'equal');
-      root.querySelectorAll('[data-w]').forEach(i => i.value = mode.value === 'percent' ? (100 / FLAT_MEMBERS.length).toFixed(2) : mode.value === 'shares' ? 1 : '');
+      root.querySelectorAll('[data-w]').forEach(i => i.value = mode.value === 'percent' ? (100 / members.length).toFixed(2) : mode.value === 'shares' ? 1 : '');
       hint.textContent = mode.value === 'percent' ? 'Percentages must add up to 100.' : mode.value === 'shares' ? 'e.g. 2 shares for someone who uses twice as much.' : '';
     };
     mode.onchange = sync; sync();
     root.querySelector('#spForm').onsubmit = ev => {
       ev.preventDefault(); const fd = new FormData(ev.target), amount = Number(fd.get('amount')), m = fd.get('mode');
-      const w = m === 'equal' ? FLAT_MEMBERS.map(() => 1) : [...root.querySelectorAll('[data-w]')].map(i => Number(i.value) || 0);
+      const w = m === 'equal' ? members.map(() => 1) : [...root.querySelectorAll('[data-w]')].map(i => Number(i.value) || 0);
       if (!(amount > 0)) return toast('Enter an amount greater than 0', 'error');
       if (m === 'percent' && Math.abs(w.reduce((s, x) => s + x, 0) - 100) > 0.01) return toast('Percentages must add up to 100', 'error');
       if (m === 'shares' && !(w.reduce((s, x) => s + x, 0) > 0)) return toast('Give at least one person a share', 'error');
-      const sh = splitShares(amount, m, w), shares = {}; FLAT_MEMBERS.forEach((n, i) => shares[n] = sh[i]);
+      const sh = splitShares(amount, m, w), shares = {}; members.forEach((n, i) => shares[n] = sh[i]);
       if (Object.values(shares).some(v => v < 0)) return toast('Shares cannot be negative', 'error');
       const notes = String(fd.get('notes')).trim();
       closeModal();
-      state.expenses.push({ id:'exp_'+uid(), amount, category:fd.get('category'), date:todayISO(), notes, paidBy:fd.get('paidBy'), receipt:null, split:{ members:FLAT_MEMBERS, mode:m, shares } });
+      state.expenses.push({ id:'exp_'+uid(), amount, category:fd.get('category'), date:todayISO(), notes, paidBy:fd.get('paidBy'), receipt:null, split:{ members, mode:m, shares } });
       saveState(); render(); toast('Shared expense added', 'success');
     };
   });
 }
+
+/* ---------- Manage group: group name + flatmates (Splits screen "Manage" button) ---------- */
+function flatmateRowsHTML() {
+  if (!state.flatmates.length) return `<p class="text-xs text-slate-400">No flatmates added yet.</p>`;
+  return `<ul class="space-y-1.5">${state.flatmates.map((m, i) => `
+    <li class="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
+      <span class="text-sm text-slate-800">${esc(m)}</span>
+      <button type="button" onclick="removeFlatmate(${i})" class="text-xs font-medium text-red-600 hover:text-red-700">Remove</button>
+    </li>`).join('')}</ul>`;
+}
+function openManageGroup() {
+  openModal('Manage group', `
+    <label class="block text-sm font-medium mb-3">Group name<input id="groupNameInput" value="${esc(state.groupName || '')}" placeholder="e.g. Flat 302" class="${inCls}"/></label>
+    <div class="mb-3">
+      <span class="text-sm font-medium">Flatmates</span>
+      <div id="flatmateList" class="mt-1.5 mb-2">${flatmateRowsHTML()}</div>
+      <form id="addFlatmateForm" class="flex gap-2">
+        <input id="newFlatmateName" placeholder="Add a flatmate's name" maxlength="30" class="${inCls} flex-1"/>
+        <button type="submit" class="bg-teal-600 text-white font-semibold px-4 rounded-lg">Add</button>
+      </form>
+    </div>
+    <button type="button" onclick="saveGroupName()" class="w-full bg-teal-600 text-white font-semibold py-2.5 rounded-lg">Done</button>
+  `, root => {
+    root.querySelector('#addFlatmateForm').addEventListener('submit', ev => {
+      ev.preventDefault();
+      addFlatmate(root.querySelector('#newFlatmateName').value);
+      root.querySelector('#flatmateList').innerHTML = flatmateRowsHTML();
+      root.querySelector('#newFlatmateName').value = '';
+    });
+  });
+}
+function addFlatmate(rawName) {
+  const name = rawName.trim().replace(/['"\\]/g, '');
+  if (!name) return toast('Enter a name', 'error');
+  if (name.toLowerCase() === 'you' || name === ME) return toast('That name is reserved — try something else', 'error');
+  if (state.flatmates.some(m => m.toLowerCase() === name.toLowerCase())) return toast('That flatmate is already in the group', 'error');
+  state.flatmates.push(name);
+  saveState();
+}
+function removeFlatmate(index) {
+  const name = state.flatmates[index];
+  if (name === undefined) return;
+  const gExps = state.expenses.filter(e => e.split);
+  const balances = computeBalances(gExps, membersList());
+  if (Math.abs(balances[name] || 0) > 0.01) {
+    return toast(`Settle up with ${name} before removing them`, 'error');
+  }
+  state.flatmates.splice(index, 1);
+  saveState();
+  const list = document.getElementById('flatmateList');
+  if (list) list.innerHTML = flatmateRowsHTML();
+}
+function saveGroupName() {
+  const el = document.getElementById('groupNameInput');
+  state.groupName = el ? el.value.trim() : state.groupName;
+  saveState(); closeModal(); render();
+}
 function settleExtraHTML(s) {
   const b = 'class="text-xs font-medium border border-slate-300 text-slate-700 px-2 py-1 rounded"';
-  if (s.from === 'Aarav') return `<button onclick="payUPI('${s.to}',${s.amount})" ${b}>Pay via UPI</button>`;
-  if (s.to === 'Aarav') return `<button onclick="remindOwes('${s.from}',${s.amount})" ${b}>Remind</button>`;
+  if (s.from === ME) return `<button onclick="payUPI('${esc(s.to)}',${s.amount})" ${b}>Pay via UPI</button>`;
+  if (s.to === ME) return `<button onclick="remindOwes('${esc(s.from)}',${s.amount})" ${b}>Remind</button>`;
   return '';
 }
 function openUpiId(name, cb) {
@@ -2019,7 +2089,7 @@ function openUpiId(name, cb) {
 function payUPI(to, amount) {
   const id = ext().upi[to]; if (!id) return openUpiId(to, () => payUPI(to, amount));
   toast('Opening your UPI app. Tap "Mark paid" after paying.', 'info');
-  location.href = `upi://pay?pa=${encodeURIComponent(id)}&pn=${encodeURIComponent(to)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Flat 302 split')}`;
+  location.href = `upi://pay?pa=${encodeURIComponent(id)}&pn=${encodeURIComponent(to)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent((state.groupName || 'Shared expense') + ' split')}`;
 }
 function remindOwes(from, amount) {
   const text = `Hi ${from}! Friendly nudge: ${fmtINR2(amount)} is pending for our flat expenses. No rush, pay whenever convenient 🙂`;
