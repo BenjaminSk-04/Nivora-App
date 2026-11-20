@@ -1,10 +1,28 @@
-node_modules/
-dist/
-android/
-ios/
+# Gradle
+.gradle/
+build/
+android/app/build/
+android/build/
+android/local.properties
+
+# Gradle wrapper jar is intentionally NOT ignored — see README for why it's
+# missing from this repo and how to regenerate it once, after cloning.
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Keystores (never commit signing keys)
 *.jks
 *.keystore
-.env
-.env.*
+
+# OS / editor junk
 .DS_Store
-.vite/
+Thumbs.db
+
+# Logs
+*.log
