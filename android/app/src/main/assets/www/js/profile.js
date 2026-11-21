@@ -70,7 +70,8 @@ const OB_STEPS = [
   { id:'contact',   icon:'📱', title:'How can we reach you?', hint:'Used for account recovery and reminders. Optional.' },
   { id:'health',    icon:'🩺', title:'Tell us about your health', hint:'Helps personalise medicine tools. Optional.' },
   { id:'emergency', icon:'🚨', title:'Who should we call in an emergency?', hint:'Optional. Stored only in this browser.' },
-  { id:'money',     icon:'💰', title:'Your monthly money picture', hint:'Your budget is split across categories automatically.' },
+  { id:'money',     icon:'💰', title:'Your monthly money picture', hint:'Next, you can fine-tune it for each category.' },
+  { id:'budgets',   icon:'🧾', title:'Plan your monthly expenses', hint:'Set a budget for each category. You can change these any time in Budgets.' },
   { id:'goals',     icon:'🎯', title:'What do you hope to achieve with Nivora?', hint:'You can choose more than one.' },
 ];
 
@@ -86,6 +87,11 @@ const OB_FIELDS = { obName:'name', obPhone:'phone', obCity:'city', obAllergies:'
 
 function obRead() { // copy whatever inputs are on screen into the draft (no validation)
   for (const [id, key] of Object.entries(OB_FIELDS)) { const el = document.getElementById(id); if (el) ob.d[key] = el.value.trim(); }
+  if (document.getElementById('obCat_' + CATEGORIES[0])) { // "Plan your monthly expenses" step
+    ob.cat = {};
+    CATEGORIES.forEach(c => { const el = document.getElementById('obCat_' + c); ob.cat[c] = el ? el.value.trim() : ''; });
+    ob.d.monthlyBudget = String(obCatSum()); // the category amounts are the source of truth for the total
+  }
   const dd = document.getElementById('obDay');
   if (dd) {
     const day = dd.value, mon = document.getElementById('obMonth').value, yr = document.getElementById('obYear').value;
@@ -103,11 +109,37 @@ function obValidate() {
     if (!phoneOk(d.emergencyPhone)) return 'Enter a valid phone number (10 to 13 digits).';
     if (d.emergencyName && !d.emergencyPhone) return 'Add a phone number for your emergency contact.';
   }
+  if (id === 'budgets') for (const c of CATEGORIES) { const v = ob.cat?.[c]; if (v !== '' && v !== undefined && !(Number(v) >= 0)) return 'Enter amounts as positive numbers.'; }
   if (id === 'money') for (const k of ['monthlyIncome', 'monthlyBudget']) if (d[k] !== '' && !(Number(d[k]) >= 0)) return 'Enter amounts as positive numbers.';
   return '';
 }
 
-function obGo(delta) { ob.step = Math.max(0, Math.min(OB_STEPS.length - 1, ob.step + delta)); ob.err = ''; render(); window.scrollTo(0, 0); }
+function obGo(delta) {
+  ob.step = Math.max(0, Math.min(OB_STEPS.length - 1, ob.step + delta));
+  if (OB_STEPS[ob.step].id === 'budgets') obPrepareCategoryBudgets();
+  ob.err = ''; render(); window.scrollTo(0, 0);
+}
+
+/* Category budgets for the wizard. Start from the total chosen on the previous step; keep
+   the person's own edits unless they've since changed that total. */
+function obCatSum() { return CATEGORIES.reduce((s, c) => s + (Number(ob.cat?.[c]) || 0), 0); }
+function obPrepareCategoryBudgets() {
+  const total = Math.max(0, Number(ob.d.monthlyBudget) || 0);
+  if (!ob.cat || obCatSum() !== total) ob.cat = splitBudget(total);
+}
+function obCatNoteText() {
+  const income = Number(ob.d.monthlyIncome) || 0, sum = obCatSum();
+  if (!(income > 0)) return 'Starts from your monthly budget. Adjust any category.';
+  return sum > income
+    ? `⚠️ That is ${fmtINR(sum - income)} more than your monthly income.`
+    : `${Math.round(sum / income * 100)}% of your monthly income, leaving ${fmtINR(income - sum)} for savings.`;
+}
+function obCatTotalUpdate() {
+  obRead();
+  const t = document.getElementById('obCatTotal'), n = document.getElementById('obCatNote');
+  if (t) t.textContent = fmtINR(obCatSum());
+  if (n) n.textContent = obCatNoteText();
+}
 
 function obNext() {
   obRead(); ob.err = obValidate();
@@ -133,7 +165,12 @@ function obToggle(key, v) {
 function obFinish() {
   setProfile({ ...ob.d, onboarded: true });
   setUserName(ob.d.name || state.user.name || 'Nivora User');
-  applyBudget(ob.d.monthlyBudget); saveState();
+  if (ob.cat) {
+    state.budgets = {};
+    CATEGORIES.forEach(c => { state.budgets[c] = Math.max(0, Number(ob.cat[c]) || 0); });
+    state.totalBudgetMonthly = obCatSum();
+  } else applyBudget(ob.d.monthlyBudget);
+  saveState();
   toast('Profile saved. Welcome to Nivora!', 'success'); navigate('/dashboard');
 }
 
@@ -177,6 +214,19 @@ function obStepBody(id, d) {
     ${obField('obEmPhone', 'Contact phone', d.emergencyPhone, 'type="tel" inputmode="tel" placeholder="+91 98765 43210"')}</div>`;
   if (id === 'money') return `<div class="space-y-4">${obField('obIncome', 'Monthly income (₹)', d.monthlyIncome, 'type="number" inputmode="decimal" min="0" step="1" placeholder="e.g. 45000"')}
     ${obField('obBudget', 'Monthly spending budget (₹)', d.monthlyBudget, 'type="number" inputmode="decimal" min="0" step="1"')}</div>`;
+  if (id === 'budgets') {
+    const cat = ob.cat || {};
+    const rows = CATEGORIES.map(c => { const m = CATEGORY_META[c]; return `<label class="flex items-center gap-3">
+      <span class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0" aria-hidden="true">${m.icon}</span>
+      <span class="flex-1 min-w-0"><span class="block text-sm font-semibold text-slate-800">${c}</span><span class="block text-xs text-slate-500">${esc(m.hint)}</span></span>
+      <span class="relative w-32 flex-shrink-0"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" aria-hidden="true">₹</span>
+        <input id="obCat_${c}" type="number" inputmode="decimal" min="0" step="1" value="${esc(String(cat[c] ?? ''))}" oninput="obCatTotalUpdate()" aria-label="${c} monthly budget" class="w-full pl-7 pr-3 py-2.5 border border-slate-300 rounded-xl focus:border-teal-500 outline-none text-right"/></span></label>`; }).join('');
+    return `<div class="space-y-3">${rows}</div>
+      <div class="mt-5 rounded-2xl bg-teal-50 border border-teal-200 p-4">
+        <div class="flex items-center justify-between"><span class="text-sm font-semibold text-teal-900">Total monthly budget</span><span id="obCatTotal" class="text-xl font-extrabold text-teal-800">${fmtINR(obCatSum())}</span></div>
+        <p id="obCatNote" class="text-xs text-teal-800 mt-1">${esc(obCatNoteText())}</p>
+      </div>`;
+  }
   if (id === 'goals') return `<div class="space-y-1">${GOALS.map(g => obRow(g, d.goals.includes(g), `obToggle('goals','${g}')`)).join('')}</div>`;
   return '';
 }

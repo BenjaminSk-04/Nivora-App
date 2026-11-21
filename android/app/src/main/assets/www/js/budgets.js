@@ -9,21 +9,25 @@ function totalBudget() {
     : Object.values(state.budgets).reduce((s,v) => s+Number(v || 0), 0);
 }
 
-function distributeTotalBudget(total) {
+/* Split a total across categories, in proportion to the current category budgets
+   (or evenly if none are set). Pure: returns { Category: amount } without touching state. */
+function splitBudget(total) {
   const weights = CATEGORIES.map(c => Math.max(0, Number(state.budgets?.[c] || 0)));
   const weightSum = weights.reduce((sum, value) => sum + value, 0);
   const effectiveWeights = weightSum > 0 ? weights : CATEGORIES.map(() => 1);
   const denominator = effectiveWeights.reduce((sum, value) => sum + value, 0);
+  const out = {};
   let allocated = 0;
-  state.budgets = {};
   CATEGORIES.forEach((category, index) => {
     const amount = index === CATEGORIES.length - 1
       ? Math.max(0, total - allocated)
       : Math.round(total * effectiveWeights[index] / denominator);
-    state.budgets[category] = amount;
+    out[category] = amount;
     allocated += amount;
   });
+  return out;
 }
+function distributeTotalBudget(total) { state.budgets = splitBudget(total); }
 
 function categorySpentThisMonth() {
   const map = Object.fromEntries(CATEGORIES.map(c => [c, 0]));
