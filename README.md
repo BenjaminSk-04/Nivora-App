@@ -8,6 +8,8 @@ account, and no tracking.
 > self-contained HTML/JS/CSS app (`android/app/src/main/assets/www/index.html`).
 > See [How it's built](#how-its-built) below for what that means in practice.
 
+![Nivora icon](docs/app-icon-512.png)
+
 ## Features
 
 **Money**
@@ -55,33 +57,49 @@ Medicine reminders and stock tracking themselves are untouched.
 
 ## How it's built
 
-The actual app logic, UI, and all data handling live in one file:
+The app (UI, logic, data handling) is plain client-side JavaScript — no
+framework, no build step — split into small feature modules under:
 
 ```
-android/app/src/main/assets/www/index.html
+android/app/src/main/assets/www/
+  index.html          <- page shell: styles, Tailwind, and the <script> list
+  js/
+    utils.js  assets.js  identity.js  state.js  forms.js  ui-core.js   (foundation)
+    nav.js  profile.js  charts.js                                       (shared UI)
+    dashboard.js  expenses.js  budgets.js  splits.js                    (money)
+    medicines.js                                                        (health)
+    insights.js  settings.js  backup.js  smart-add.js  bills.js  scan-bill.js
+    render.js  boot.js                                                  (router + startup)
 ```
 
-This is a complete, self-contained client-side app (vanilla JS, Tailwind for
-styling, `localStorage` for data) that was originally a browser prototype.
-`MainActivity.kt` just hosts it full-screen in a `WebView` and bridges the
-handful of things a plain web page can't do on its own:
+`MainActivity.kt` hosts this in a full-screen `WebView` and bridges the few
+things a plain web page can't do on Android:
 
 | Feature in the web app | How the Android shell makes it work |
 |---|---|
 | **Scan bill** (camera/gallery `<input type=file>`) | `WebChromeClient.onShowFileChooser` launches the real system camera or document picker and feeds the result back in. |
-| **Backup & Restore** | `window.AndroidBridge.saveBackup()` / `.pickBackup()` use Android's Storage Access Framework so you pick a real save/open location, instead of relying on a browser download link (which a bare WebView doesn't support). |
-| External links (e.g. the WhatsApp caregiver-alert link) | Opened in a real browser/WhatsApp via an Android `Intent`, instead of navigating away inside the WebView. |
+| **Backup & Restore** | `window.AndroidBridge.saveBackup()` / `.pickBackup()` use Android's Storage Access Framework so you pick a real save/open location. |
+| External links (e.g. the WhatsApp caregiver-alert link) | Opened in a real browser/WhatsApp via an Android `Intent`. |
 
-Everything else — adding an expense, medicine reminders, budgets, the OCR
-itself — is plain JavaScript running in the WebView, exactly as it would in a
-desktop browser.
+### Modifying the app
 
-**Why a WebView wrapper and not a fully native (Kotlin/Compose) rewrite?**
-This was a deliberate, explicit choice for this version of the app (a full
-native rewrite is a much larger undertaking). The trade-off: it ships faster
-and is easy for anyone who knows JS to contribute to, but it feels closer to a
-well-packaged website than a from-scratch native app, and it needs internet
-access on first launch (see below).
+Each file starts with a header comment saying what it owns. Typical edits:
+
+- **Change a screen** — open its file (e.g. Budgets → `budgets.js`). Each screen
+  is a `views['/route'] = () => ...` function returning an HTML string.
+- **Add a screen** — create `js/myfeature.js`, register `views['/myfeature']`,
+  add a `<script src="js/myfeature.js">` line in `index.html` (before
+  `render.js`), and link to it from `nav.js`.
+- **Change what is stored** — edit `buildSeed()` in `state.js`, bump
+  `SCHEMA_VERSION`, and add a `MIGRATIONS` step so existing users keep their data.
+- **Branding** — logos and icons live in `assets.js`.
+
+**Script order matters.** These are classic (non-module) scripts sharing one
+global scope, so they work straight from `file://` inside the WebView with no
+bundler. Rules: `nav.js` (which creates the `views` registry) loads before any
+file that registers a view, and `boot.js` always loads last — it is the only
+file that runs state-dependent code at startup. Everything else just defines
+functions.
 
 ### Known limitations
 
@@ -131,7 +149,7 @@ The unsigned APK lands in `android/app/build/outputs/apk/release/`.
 android/
   app/
     src/main/
-      assets/www/index.html   ← the entire web app (UI + logic + data layer)
+      assets/www/             ← the web app: index.html + js/ feature modules
       java/com/nivora/app/
         MainActivity.kt       ← WebView host + native bridges
       res/                    ← app icon, theme, strings
@@ -149,8 +167,8 @@ you like.
 
 ## Contributing
 
-Issues and pull requests are welcome. Since the whole app is one HTML file,
-most feature work happens there — the Android-specific code in
+Issues and pull requests are welcome. Most feature work happens in the
+modules under `assets/www/js/` — the Android-specific code in
 `MainActivity.kt` is intentionally small and focused on the native bridges
 listed above.
 

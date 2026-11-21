@@ -4,9 +4,16 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.graphics.Color
 import android.os.Bundle
 import android.provider.MediaStore
+import android.view.View
+import android.widget.LinearLayout
 import androidx.activity.OnBackPressedCallback
+import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
@@ -111,7 +118,7 @@ class MainActivity : AppCompatActivity() {
             webChromeClient = NivoraWebChromeClient()
             loadUrl("file:///android_asset/www/index.html")
         }
-        setContentView(webView)
+        setupSystemBars()
 
         // Let in-page "back" (closing a modal, going to the previous tab) win first;
         // only exit the app once there is nothing left for the WebView to go back to.
@@ -123,6 +130,45 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+    }
+
+    /**
+     * Android 15+ forces edge-to-edge: the app draws underneath the status and navigation bars.
+     * Without handling that, the status bar icons (clock, battery) end up invisible on top of the
+     * page. So: reserve a teal strip exactly as tall as the status bar (white icons show on it),
+     * and pad the bottom for the navigation bar and the on-screen keyboard.
+     */
+    private fun setupSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        val statusStrip = View(this).apply {
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.nivora_teal_dark))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0)
+        }
+        webView.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+        )
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.WHITE)
+            addView(statusStrip)
+            addView(webView)
+        }
+        setContentView(root)
+
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            statusStrip.layoutParams.height = bars.top
+            statusStrip.requestLayout()
+            view.setPadding(bars.left, 0, bars.right, maxOf(bars.bottom, ime.bottom))
+            WindowInsetsCompat.CONSUMED
+        }
+
+        // Light (white) status bar icons, because the strip behind them is dark teal.
+        WindowCompat.getInsetsController(window, root).isAppearanceLightStatusBars = false
     }
 
     // ---------------------------------------------------------------------
