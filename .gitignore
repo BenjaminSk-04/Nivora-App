@@ -5,8 +5,8 @@ android/app/build/
 android/build/
 android/local.properties
 
-# Gradle wrapper jar is intentionally NOT ignored — see README for why it's
-# missing from this repo and how to regenerate it once, after cloning.
+# Gradle wrapper jar is intentionally NOT ignored (it is simply not committed yet;
+# see docs/RELEASING.md and the CI workflow, which does not need it).
 
 # Android Studio / IntelliJ
 .idea/
@@ -16,7 +16,8 @@ captures/
 .externalNativeBuild/
 .cxx/
 
-# Keystores (never commit signing keys)
+# Signing keys and their passwords (NEVER commit these)
+keystore.properties
 *.jks
 *.keystore
 

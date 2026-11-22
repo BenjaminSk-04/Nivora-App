@@ -1,5 +1,5 @@
 /* =====================================================================
-   settings.js - Settings screen and the "clear all data" confirmation.
+   settings.js - the Settings screen (profile card, accessibility, backup and restore).
    ===================================================================== */
 
 
@@ -24,20 +24,5 @@ views['/settings'] = () => `
       <input type="file" id="importBackupInput" accept="application/json" class="hidden" onchange="handleImportBackupFile(this)"/>
       <p id="backupLastAction" class="text-xs text-slate-400"></p>
     </div>
-    <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 space-y-2">
-      <h2 class="font-bold text-slate-900 mb-2">Data & Privacy</h2>
-      <button onclick="confirmReset()" class="w-full text-left py-2 text-red-600 hover:text-red-700 font-medium">🗑️ Clear all data</button>
-      <button onclick="confirmResetProfile()" class="w-full text-left py-2 text-red-600 hover:text-red-700 font-medium">🚪 Reset profile</button>
-    </div>
     <p class="text-xs text-slate-400 text-center pb-6">Nivora v1.0</p>
   </div>`;
-
-
-function confirmReset() {
-  openModal('Clear all data?', `
-    <p class="text-slate-600 mb-4">This permanently erases every expense, medicine, budget and your profile from this device, and takes you back through setup. Back up your data first from Settings if you want a copy.</p>
-    <div class="flex gap-2">
-      <button onclick="closeModal()" class="flex-1 border py-2.5 rounded-lg">Cancel</button>
-      <button onclick="clearAllData();closeModal()" class="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-lg">Clear everything</button>
-    </div>`);
-}

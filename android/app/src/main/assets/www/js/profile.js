@@ -141,18 +141,66 @@ function obCatTotalUpdate() {
   if (n) n.textContent = obCatNoteText();
 }
 
+/* "Sufficient detail" for the current step. Next/Done only lights up when the step is ok;
+   otherwise the person either completes it or taps "Skip for now". */
+function obStepState() {
+  const id = OB_STEPS[ob.step].id, d = ob.d;
+  const OK = { ok: true, msg: '' }, need = msg => ({ ok: false, msg });
+  const err = obValidate();                      // malformed input (bad phone, impossible date, ...)
+  if (err) return need(err);
+  switch (id) {
+    case 'name':      return String(d.name || '').trim().length >= 2 ? OK : need('Enter your name to continue, or skip for now.');
+    case 'gender':    return d.gender ? OK : need('Choose an option to continue, or skip for now.');
+    case 'contact':   return d.phone ? OK : need('Enter your phone number to continue, or skip for now.');
+    case 'health':    return (d.bloodGroup || String(d.allergies || '').trim() || d.conditions.length) ? OK : need('Add at least one health detail to continue, or skip for now.');
+    case 'emergency': return (String(d.emergencyName || '').trim() && d.emergencyPhone) ? OK : need('Add a contact name and phone number to continue, or skip for now.');
+    case 'money':     return Number(d.monthlyIncome) > 0 ? OK : need('Enter your monthly income to continue, or skip for now.');
+    case 'budgets':   return obCatSum() > 0 ? OK : need('Set a budget for at least one category, or skip for now.');
+    case 'goals':     return d.goals.length ? OK : need('Pick at least one goal to finish, or skip for now.');
+  }
+  return OK;
+}
+
+/* Fields owned by each step. Skipping an incomplete step discards what was half-typed, so the
+   saved profile never contains partial details (e.g. an emergency name without a phone). */
+const OB_STEP_FIELDS = { name:['name'], gender:['gender','genderOther'], contact:['phone','city'],
+  health:['bloodGroup','allergies','conditions'], emergency:['emergencyName','emergencyRelation','emergencyPhone'],
+  money:['monthlyIncome'], goals:['goals'] };
+function obClearStep(id) { for (const k of (OB_STEP_FIELDS[id] || [])) ob.d[k] = Array.isArray(ob.d[k]) ? [] : ''; }
+
+const obNextCls = ok => 'w-full font-semibold py-3.5 rounded-full flex items-center justify-center gap-2 transition ' +
+  (ok ? 'bg-teal-800 hover:bg-teal-900 text-white shadow-sm' : 'bg-teal-100 text-teal-400 cursor-not-allowed');
+
+/* Runs on every keystroke/selection: refresh the Next button + guidance without re-rendering
+   (a re-render would steal focus from the field being typed in). */
+function obLive() {
+  obRead(); ob.err = '';
+  const st = obStepState();
+  const btn = document.getElementById('obNextBtn'), guide = document.getElementById('obGuide');
+  if (btn) { btn.disabled = !st.ok; btn.setAttribute('aria-disabled', String(!st.ok)); btn.className = obNextCls(st.ok); }
+  if (guide) { guide.textContent = st.ok ? '' : st.msg; guide.className = 'text-sm text-slate-500 min-h-[1.25rem] mb-2'; }
+}
+
 function obNext() {
-  obRead(); ob.err = obValidate();
-  if (ob.err) return render();
+  obRead();
+  const st = obStepState();
+  if (!st.ok) { ob.err = st.msg; return render(); }
+  ob.err = '';
   if (ob.step === OB_STEPS.length - 1) return obFinish();
   obGo(1);
 }
 
-function obSkip() { obRead(); if (ob.step === OB_STEPS.length - 1) return obFinish(); obGo(1); }
+function obSkip() {
+  obRead();
+  if (!obStepState().ok) obClearStep(OB_STEPS[ob.step].id);
+  ob.err = '';
+  if (ob.step === OB_STEPS.length - 1) return obFinish();
+  obGo(1);
+}
 
 function obBack() { obRead(); obGo(-1); }
 
-function obSetGender(v) { obRead(); ob.d.gender = v; ob.err = ''; if (v === 'Other (please specify)') return render(); obNext(); }
+function obSetGender(v) { obRead(); ob.d.gender = v; if (v !== 'Other (please specify)') ob.d.genderOther = ''; ob.err = ''; render(); }
 
 function obPickBlood(v) { obRead(); ob.d.bloodGroup = ob.d.bloodGroup === v ? '' : v; render(); }
 
@@ -247,23 +295,29 @@ views['/onboarding'] = () => {
       <button onclick="obSkipAll()" class="w-full border-2 border-teal-700 text-teal-800 hover:bg-teal-50 font-semibold py-4 rounded-full">Skip for now</button>
     </div></div>`;
   const pct = Math.round(ob.step / (OB_STEPS.length - 1) * 100);
+  const st = obStepState(), total = OB_STEPS.length - 1, msg = ob.err || (st.ok ? '' : st.msg);
   return `<div class="min-h-screen bg-gradient-to-b from-teal-600 to-teal-700">
-    <form onsubmit="event.preventDefault(); obNext()" class="max-w-md mx-auto min-h-screen flex flex-col">
+    <form onsubmit="event.preventDefault(); obNext()" oninput="obLive()" onchange="obLive()" novalidate class="max-w-md mx-auto min-h-screen flex flex-col">
       <div class="px-6 pt-5 pb-5 text-white">
-        <button type="button" onclick="obBack()" aria-label="Back" class="w-10 h-10 -ml-2 rounded-lg hover:bg-white/10 text-2xl">←</button>
-        <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-2xl mt-6" aria-hidden="true">${step.icon}</div>
+        <div class="flex items-center justify-between">
+          <button type="button" onclick="obBack()" aria-label="Back to the previous step" class="flex items-center gap-1 -ml-2 px-2 h-10 rounded-lg hover:bg-white/10 font-medium">
+            <span class="text-2xl leading-none" aria-hidden="true">←</span><span class="text-sm">Back</span></button>
+          <span class="text-xs font-semibold tracking-wider uppercase text-teal-100">Step ${ob.step} of ${total}</span>
+        </div>
+        <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-2xl mt-5" aria-hidden="true">${step.icon}</div>
         <h1 class="text-2xl font-bold mt-4 leading-snug">${esc(step.title)}</h1>
       </div>
       <div class="mx-6 h-1.5 rounded bg-teal-900/30" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><div class="h-full rounded bg-teal-200 transition-all" style="width:${pct}%"></div></div>
       <div class="flex-1 bg-white rounded-t-3xl mt-4 flex flex-col overflow-hidden">
         ${step.hint ? `<p class="bg-slate-100 text-slate-600 px-6 py-4 text-base">${esc(step.hint)}</p>` : ''}
-        <div class="flex-1 px-6 py-5 overflow-y-auto">
-          ${obStepBody(step.id, d)}
-          ${ob.err ? `<p role="alert" class="text-sm text-red-600 mt-4">${esc(ob.err)}</p>` : ''}
-        </div>
-        <div class="px-6 pb-6 pt-3 bg-white">
-          <button type="submit" class="w-full bg-teal-800 hover:bg-teal-900 text-white font-semibold py-4 rounded-full flex items-center justify-center gap-2">${last ? 'Done' : 'Next'} <span aria-hidden="true">›</span></button>
-          ${step.required ? '' : `<button type="button" onclick="obSkip()" class="w-full text-slate-500 hover:text-slate-700 font-medium py-3">Skip</button>`}
+        <div class="flex-1 px-6 py-5 overflow-y-auto">${obStepBody(step.id, d)}</div>
+        <div class="px-6 pb-6 pt-4 bg-white border-t border-slate-100">
+          <p id="obGuide" role="status" aria-live="polite" class="text-sm ${ob.err ? 'text-red-600' : 'text-slate-500'} min-h-[1.25rem] mb-2">${esc(msg)}</p>
+          <button id="obNextBtn" type="submit" ${st.ok ? '' : 'disabled'} aria-disabled="${!st.ok}" class="${obNextCls(st.ok)}">${last ? 'Done' : 'Next'} <span aria-hidden="true">›</span></button>
+          <div class="grid ${step.required ? 'grid-cols-1' : 'grid-cols-2'} gap-3 mt-3">
+            <button type="button" onclick="obBack()" class="py-3 rounded-full border border-slate-300 text-slate-700 font-medium hover:bg-slate-50">Back</button>
+            ${step.required ? '' : `<button type="button" onclick="obSkip()" class="py-3 rounded-full border border-teal-600 text-teal-700 font-medium hover:bg-teal-50">Skip for now</button>`}
+          </div>
         </div>
       </div>
     </form></div>`;

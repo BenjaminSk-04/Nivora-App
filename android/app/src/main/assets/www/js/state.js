@@ -89,7 +89,6 @@ function saveState() {
   }
 }
 
-function clearAllData() { store.remove(STORE_KEY); state = freshState(); saveState(); obReset(); navigate('/onboarding'); toast('All data cleared', 'success'); }
 
 
 /* LEGACY one-time wipe for data written before v1.5 (its shape is unknown). Do NOT bump this

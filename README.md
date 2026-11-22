@@ -25,15 +25,13 @@
 2. [Features](#features)
 3. [Privacy and Data Handling](#privacy-and-data-handling)
 4. [Architecture](#architecture)
-5. [Getting Started](#getting-started)
-6. [Building a Release](#building-a-release)
-7. [Android Permissions](#android-permissions)
-8. [Backup and Restore](#backup-and-restore)
-9. [Known Limitations](#known-limitations)
-10. [Roadmap](#roadmap)
-11. [Contributing](#contributing)
-12. [Acknowledgements](#acknowledgements)
-13. [License](#license)
+5. [Installation](#installation)
+6. [Android Permissions](#android-permissions)
+7. [Backup and Restore](#backup-and-restore)
+8. [Known Limitations](#known-limitations)
+9. [Contributing](#contributing)
+10. [Acknowledgements](#acknowledgements)
+11. [License](#license)
 
 ---
 
@@ -49,7 +47,7 @@ stored on your own device, and you can export a full backup at any time.
 |---|---|
 | **Platform** | Android 7.0 (API 24) and above |
 | **Language** | Kotlin (native shell) and JavaScript (application logic) |
-| **Distribution** | Source on GitHub; build the APK yourself |
+| **Distribution** | Signed APK on [GitHub Releases](../../releases) |
 | **License** | MIT |
 
 ## Features
@@ -78,7 +76,7 @@ stored on your own device, and you can export a full backup at any time.
 
 ### General
 
-- Guided onboarding to create a local profile: name, health basics, emergency contact, monthly income and budget, **a budget for each expense category** (Food, Rent, Transport, Health, Utilities, Entertainment, Other, pre-filled from your total with a live total and an income check), and goals. There is no sign-up, password, or email.
+- Guided onboarding to create a local profile: name, health basics, emergency contact, monthly income and budget, and **a budget for each expense category** (Food, Rent, Transport, Health, Utilities, Entertainment, Other, pre-filled from your total with a live total and an income check). There is no sign-up, password, or email.
 - Large-text accessibility mode.
 - Full **backup and restore** to a JSON file you control.
 - Starts completely empty: no sample data is bundled.
@@ -89,7 +87,7 @@ stored on your own device, and you can export a full backup at any time.
   WebView's local storage on your device. There is no server to send them to.
 - **No account, no tracking.** No analytics, advertising, or crash-reporting SDKs are included.
 - **Network use is limited to app resources.** The interface loads Tailwind CSS, the Inter typeface, and (only when you use *Scan bill*) the Tesseract.js OCR library from public CDNs. None of your data is sent in those requests.
-- **You own your data.** Export it at any time, or remove everything with *Settings, Clear all data*.
+- **You own your data.** Export it at any time, and remove it by uninstalling the app or using Android's *App info, Storage, Clear data*.
 - **Health data note.** Nivora is a personal reminder tool. It does not provide medical advice.
 
 ## Architecture
@@ -177,62 +175,20 @@ Nivora is a thin native Android shell around a self-contained web application.
   `SCHEMA_VERSION` and a `MIGRATIONS` step in `state.js`, so existing users keep
   their data across updates.
 
-## Getting Started
+## Installation
 
-### Prerequisites
+1. Open the [Releases](../../releases) page and download the latest `.apk` from **Assets**.
+2. Open the downloaded file on your phone. If Android asks, allow installing apps from your browser or file manager (**Settings, Install unknown apps**).
+3. Launch Nivora and complete the short profile setup.
 
-- [Android Studio](https://developer.android.com/studio) Hedgehog (2023.1) or newer
-- JDK 17
-- An Android device or emulator running Android 7.0 (API 24) or newer
+**Requirements:** Android 7.0 (API 24) or newer.
 
-### Build and run
+**Updating:** download the newer APK and install it over the existing app. Your
+data is kept. Before you update, you can export a backup from
+**Settings, Backup and Restore**.
 
-1. Clone the repository.
-   ```bash
-   git clone https://github.com/<your-username>/nivora.git
-   ```
-2. In Android Studio choose **File, Open** and select the **`android/`** folder
-   (not the repository root).
-3. **Gradle wrapper.** The binary `gradle/wrapper/gradle-wrapper.jar` is not
-   committed. Android Studio offers to restore it when you open the project;
-   accept the prompt. From the command line, run this once (requires a local
-   Gradle installation):
-   ```bash
-   cd android
-   gradle wrapper --gradle-version 8.9
-   ```
-4. Let Gradle sync, then press **Run** on a device or emulator.
-
-### Command-line build
-
-```bash
-cd android
-./gradlew assembleDebug        # debug APK
-./gradlew assembleRelease      # unsigned release APK
-```
-
-Outputs are written to `android/app/build/outputs/apk/`.
-
-### Working on the web app
-
-All application code is in `android/app/src/main/assets/www/`. Edit a module,
-rebuild, and run. Each file begins with a header describing what it owns.
-
-| Task | Where |
-|---|---|
-| Change a screen | Its module (for example, Budgets is `budgets.js`). Each screen is a `views['/route']` function that returns HTML. |
-| Add a screen | Create `js/yourfeature.js`, register `views['/yourfeature']`, add a `<script>` tag in `index.html` before `render.js`, and link it from `nav.js`. |
-| Change stored data | Edit `buildSeed()` in `state.js`, bump `SCHEMA_VERSION`, and add a `MIGRATIONS` step. |
-| Change branding | `assets.js` (in-app logo) and `res/mipmap-*` (launcher icon). |
-
-## Building a Release
-
-1. Open the project in Android Studio.
-2. Choose **Build, Generate Signed App Bundle / APK**.
-3. Create or select a keystore and complete the wizard.
-
-Keep your keystore and its passwords private. `*.jks` and `*.keystore` files
-are already excluded by `.gitignore`.
+Release APKs are signed by the project maintainers, and each release includes a
+`.sha256` checksum so you can verify the download.
 
 ## Android Permissions
 
@@ -280,16 +236,19 @@ uninstalling.
   are specific to India.
 - **No automated tests.** The project currently relies on manual testing.
 
-## Roadmap
-
-- [ ] Native background reminders (AlarmManager or WorkManager with notification channels)
-- [ ] Bundle Tailwind, fonts, and the OCR library for fully offline use
-- [ ] Automated tests for the balance, split, and parsing logic
-- [ ] Configurable currency
-- [ ] CSV export of expenses
-- [ ] Dark theme
-
 ## Contributing
+
+### Working on the code
+
+All application code is in `android/app/src/main/assets/www/`. Each file begins
+with a header describing what it owns.
+
+| Task | Where |
+|---|---|
+| Change a screen | Its module (for example, Budgets is `budgets.js`). Each screen is a `views['/route']` function that returns HTML. |
+| Add a screen | Create `js/yourfeature.js`, register `views['/yourfeature']`, add a `<script>` tag in `index.html` before `render.js`, and link it from `nav.js`. |
+| Change stored data | Edit `buildSeed()` in `state.js`, bump `SCHEMA_VERSION`, and add a `MIGRATIONS` step. |
+| Change branding | `assets.js` (in-app logo) and `res/mipmap-*` (launcher icon). |
 
 Contributions are welcome.
 

@@ -43,6 +43,23 @@ function openModal(title, bodyHTML, onMount) {
 
 function closeModal() { const r = $('#modal-root'); r.innerHTML = ''; r.onkeydown = null; }
 
+/* Called by the Android shell on the system Back button / gesture: if a dialog is open,
+   close it and report that Back was handled; otherwise let the app navigate back or exit. */
+window.nivoraHandleBack = () => {
+  const root = $('#modal-root');
+  if (root && root.innerHTML.trim()) { closeModal(); return true; }
+  return false;
+};
+
+/* Share plain text: Android's share sheet in the app; Web Share / clipboard in a browser. */
+function shareText(title, text) {
+  if (window.AndroidBridge && typeof AndroidBridge.shareText === 'function') return AndroidBridge.shareText(title, text);
+  if (navigator.share) return navigator.share({ title, text }).catch(() => {});
+  if (navigator.clipboard && navigator.clipboard.writeText)
+    return navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard', 'success'), () => toast('Could not share', 'error'));
+  toast('Sharing is not available on this device', 'warning');
+}
+
 
 async function ensureNotificationPerm() {
   if (!('Notification' in window)) return false;

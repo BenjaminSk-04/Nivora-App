@@ -1,7 +1,20 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+// ---- Release signing -------------------------------------------------------------------
+// Credentials come from android/keystore.properties (local builds; git-ignored) or from
+// SIGNING_* environment variables (CI). If neither is present, the release build is simply
+// left unsigned, so contributors without the key can still build. See docs/RELEASING.md.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+fun signingSetting(property: String, env: String): String? =
+    keystoreProperties.getProperty(property) ?: System.getenv(env)
 
 android {
     namespace = "com.nivora.app"
@@ -11,14 +24,27 @@ android {
         applicationId = "com.nivora.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
+        versionCode = 2
         versionName = "1.0"
+    }
+
+    val releaseStoreFile = signingSetting("storeFile", "SIGNING_STORE_FILE")
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile)
+                storePassword = signingSetting("storePassword", "SIGNING_STORE_PASSWORD")
+                keyAlias = signingSetting("keyAlias", "SIGNING_KEY_ALIAS")
+                keyPassword = signingSetting("keyPassword", "SIGNING_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
 

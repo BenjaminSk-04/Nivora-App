@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.view.View
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -124,9 +125,14 @@ class MainActivity : AppCompatActivity() {
         // only exit the app once there is nothing left for the WebView to go back to.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (webView.canGoBack()) webView.goBack() else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
+                // 1) an open dialog (e.g. the adherence report) closes first,
+                // 2) otherwise go back through in-app screens, 3) otherwise leave the app.
+                webView.evaluateJavascript("window.nivoraHandleBack ? window.nivoraHandleBack() : false") { handled ->
+                    if (handled == "true") return@evaluateJavascript
+                    if (webView.canGoBack()) webView.goBack() else {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
                 }
             }
         })
@@ -178,15 +184,18 @@ class MainActivity : AppCompatActivity() {
     private inner class NivoraWebViewClient : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView, request: android.webkit.WebResourceRequest): Boolean {
             val uri = request.url
-            return if (uri.scheme == "http" || uri.scheme == "https") {
-                try {
-                    startActivity(Intent(Intent.ACTION_VIEW, uri))
-                } catch (_: Exception) {
-                    // No app can handle it (e.g. no browser/WhatsApp installed) - just ignore.
+            return when (uri.scheme) {
+                null, "file", "about", "javascript", "data", "blob" -> false // the app itself stays in the WebView
+                else -> {
+                    // http(s) links, upi:// payments, tel:, mailto:, whatsapp: ... open in the right app.
+                    // They must never load inside the WebView, which would replace the whole app screen.
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    } catch (_: Exception) {
+                        Toast.makeText(this@MainActivity, "No app found to open this link", Toast.LENGTH_SHORT).show()
+                    }
+                    true
                 }
-                true
-            } else {
-                false // file:// (our app) and javascript:/about:blank etc. stay in the WebView
             }
         }
     }
@@ -286,6 +295,16 @@ class MainActivity : AppCompatActivity() {
                 putExtra(Intent.EXTRA_TITLE, filename)
             }
             runOnUiThread { createBackupDocLauncher.launch(intent) }
+        }
+
+        @JavascriptInterface
+        fun shareText(title: String, text: String) {
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, title)
+                putExtra(Intent.EXTRA_TEXT, text)
+            }
+            runOnUiThread { startActivity(Intent.createChooser(send, title)) }
         }
 
         @JavascriptInterface

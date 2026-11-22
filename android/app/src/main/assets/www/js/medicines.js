@@ -334,9 +334,12 @@ function caregiverPrompt(med, time) {
     <button onclick="closeModal()" class="mt-2 w-full border py-2.5 rounded-lg">Not now</button>`);
 }
 
-function openAdherenceReport() {
+/* ---- Doctor-ready adherence report ----
+   Shown inside the app (a dialog with Close), and shareable as plain text. It must NOT use
+   window.open(): Android's WebView has no extra windows, so that would replace the whole app. */
+function adherenceRows() {
   const now = new Date(), nm = now.getHours() * 60 + now.getMinutes();
-  const rows = state.medicines.map(m => {
+  return state.medicines.map(m => {
     let due = 0, taken = 0, skipped = 0;
     for (let i = 0; i < 30; i++) {
       const d = daysAgoISO(i); if (!isDoseDue(m, d)) continue;
@@ -345,14 +348,51 @@ function openAdherenceReport() {
         due++; const s = m.log?.[d]?.[t]; if (s === 'taken') taken++; else if (s === 'skipped') skipped++;
       }
     }
-    return `<tr><td>${esc(m.name)}<br><small>${esc(m.salt || '')} · ${esc(m.dosage || '')}</small></td><td>${m.times.map(fmtTime12).join(', ')}</td><td>${taken}/${due}</td><td>${skipped}</td><td>${due - taken - skipped}</td><td><b>${due ? Math.round(taken / due * 100) : 0}%</b></td></tr>`;
-  }).join('');
-  const w = window.open('', '_blank'); if (!w) return toast('Allow pop-ups to open the report', 'warning');
-  w.document.write(`<!doctype html><title>Adherence report</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Inter,system-ui,sans-serif;margin:24px;color:#0f172a}table{border-collapse:collapse;width:100%}td,th{border:1px solid #cbd5e1;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f1f5f9}small{color:#64748b}</style>
-    <h2>Medication adherence report</h2><p>${esc(state.user.name)} · last 30 days · generated ${now.toLocaleDateString('en-IN')}</p>
-    <table><tr><th>Medicine</th><th>Schedule</th><th>Taken</th><th>Skipped</th><th>Missed</th><th>Adherence</th></tr>${rows || '<tr><td colspan=6>No medicines</td></tr>'}</table>
-    <p><small>Self-reported in Nivora. Not a medical record. Please discuss any changes with your doctor.</small></p>`);
-  w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
+    return { m, due, taken, skipped, missed: due - taken - skipped, pct: due ? Math.round(taken / due * 100) : 0 };
+  });
+}
+
+function adherenceReportText(rows) {
+  const lines = ['Medication adherence report',
+    `${state.user.name || 'Patient'} · last 30 days · ${new Date().toLocaleDateString('en-IN')}`, ''];
+  rows.forEach(r => lines.push(
+    `${r.m.name}${r.m.dosage ? ' (' + r.m.dosage + ')' : ''} - ${r.m.times.map(fmtTime12).join(', ')}`,
+    `  Taken ${r.taken}/${r.due} (${r.pct}%), skipped ${r.skipped}, missed ${r.missed}`));
+  lines.push('', 'Self-reported in Nivora. Not a medical record. Please discuss any changes with your doctor.');
+  return lines.join('\n');
+}
+
+function shareAdherenceReport() { shareText('Medication adherence report', adherenceReportText(adherenceRows())); }
+
+function openAdherenceReport() {
+  const rows = adherenceRows();
+  const due = rows.reduce((t, r) => t + r.due, 0), taken = rows.reduce((t, r) => t + r.taken, 0);
+  const overall = due ? Math.round(taken / due * 100) : 0;
+  const tone = p => p >= 80 ? ['text-teal-700', 'bg-teal-500'] : p >= 50 ? ['text-amber-700', 'bg-amber-500'] : ['text-red-600', 'bg-red-500'];
+  const card = r => { const [txt, bar] = tone(r.pct); return `<div class="border border-slate-200 rounded-xl p-4">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0"><p class="font-semibold text-slate-900">${esc(r.m.name)}</p>
+          <p class="text-xs text-slate-500">${esc([r.m.salt, r.m.dosage].filter(Boolean).join(' · '))}</p>
+          <p class="text-xs text-slate-500 mt-0.5">${r.m.times.map(fmtTime12).join(', ')}</p></div>
+        <p class="text-2xl font-extrabold ${txt}">${r.pct}%</p></div>
+      <div class="h-1.5 rounded bg-slate-100 mt-3 overflow-hidden"><div class="h-full ${bar}" style="width:${r.pct}%"></div></div>
+      <div class="grid grid-cols-3 gap-2 text-center mt-3">
+        <div><p class="font-bold text-slate-900">${r.taken}/${r.due}</p><p class="text-[11px] text-slate-500">Taken</p></div>
+        <div><p class="font-bold text-slate-900">${r.skipped}</p><p class="text-[11px] text-slate-500">Skipped</p></div>
+        <div><p class="font-bold text-slate-900">${r.missed}</p><p class="text-[11px] text-slate-500">Missed</p></div></div></div>`; };
+  const [oTxt] = tone(overall);
+  openModal('Adherence report', `<div class="space-y-4">
+    <p class="text-sm text-slate-500">${esc(state.user.name || '')}${state.user.name ? ' · ' : ''}last 30 days · ${new Date().toLocaleDateString('en-IN')}</p>
+    ${rows.length ? `<div class="bg-slate-50 rounded-xl p-4 flex items-center justify-between">
+        <div><p class="text-xs uppercase tracking-wide font-semibold text-slate-500">Overall adherence</p><p class="text-xs text-slate-500">${taken} of ${due} doses taken</p></div>
+        <p class="text-3xl font-extrabold ${oTxt}">${overall}%</p></div>
+      <div class="space-y-3">${rows.map(card).join('')}</div>`
+      : `<p class="text-center text-slate-500 py-6">No medicines added yet.</p>`}
+    <p class="text-xs text-slate-400">Self-reported in Nivora. Not a medical record. Please discuss any changes with your doctor.</p>
+    <div class="grid grid-cols-2 gap-3">
+      <button type="button" onclick="closeModal()" class="py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50">Close</button>
+      <button type="button" onclick="shareAdherenceReport()" ${rows.length ? '' : 'disabled'} class="py-3 rounded-xl font-semibold ${rows.length ? 'bg-teal-600 hover:bg-teal-700 text-white' : 'bg-teal-100 text-teal-400 cursor-not-allowed'}">Share report</button>
+    </div></div>`);
 }
 
 
